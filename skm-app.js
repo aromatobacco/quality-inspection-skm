@@ -84,7 +84,7 @@
     document.querySelectorAll('.nav-button').forEach(el=>{if(el.dataset.view===id)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current')});
     const info={dashboard:['Ringkasan Produksi SKM','Dashboard harian, mingguan, dan bulanan untuk Maker dan Packaging dalam satu halaman.'],maker:['Maker Station · Rokok Batangan','Catat pemeriksaan physical dan jumlah batang baik per parameter visual.'],packer:['Packer Station · Packaging','Catat jumlah pack baik, lalu lihat status GOOD atau BAD otomatis.'],history:['Data Inspeksi SKM','Telusuri semua hasil inspeksi dari periode dan bagian SKM.'],settings:['Pengaturan Akun SKM','Kelola akses Admin, QC Inspector, dan Guest seperti dashboard SKT.']};
     $('view-title').textContent=info[id][0];$('view-description').textContent=info[id][1];
-    if(id==='dashboard')renderDashboard();if(id==='history')renderHistory();if(id==='settings')loadUsers();
+    if(id==='dashboard')renderDashboard();if(id==='maker'||id==='packer')renderStation(id);if(id==='history')renderHistory();if(id==='settings')loadUsers();
     window.scrollTo({top:0,behavior:'smooth'});
   }
   function tableMarkup(rows,includeActions){if(!rows.length)return '<div class="empty">Belum ada inspeksi pada filter yang dipilih.</div>';return `<div class="table-wrap"><table><thead><tr><th>Tanggal / Jam</th><th>Bagian</th><th>Brand / Mesin</th><th>QC / Shift</th><th>In / Out</th><th>Hasil</th><th>Temuan / Keterangan</th><th>Sumber</th>${includeActions?'<th>Aksi</th>':''}</tr></thead><tbody>${rows.map(r=>`<tr><td>${safe(displayDate(r.date))}<br><span class="muted">${safe(r.time)}</span></td><td>${r.type==='Maker'?'Rokok Batangan':'Packaging'}</td><td><b>${safe(r.brand)}</b><br>${safe(r.machine)}</td><td>${safe(r.qc)}<br><span class="muted">${safe(r.shift)}</span></td><td>${pct(r.result.good,r.result.inspected)} / ${pct(r.result.inspected-r.result.good,r.result.inspected)}</td><td><span class="tag ${r.result.status==='GOOD'?'good':'bad'}">${r.result.status}</span></td><td>${safe(r.result.issues.slice(0,2).join('; ')||r.trouble||r.notes||'Tidak ada temuan')} ${r.result.issues.length>2?`(+${r.result.issues.length-2} lainnya)`:''}</td><td><span class="tag ${r.source==='Contoh'?'demo':'local'}">${safe(r.source||'Tersimpan')}</span></td>${includeActions?`<td>${canDeleteRecord(r)?`<button type="button" class="delete" data-delete="${safe(r.id)}" aria-label="Hapus inspeksi">Hapus</button>`:'—'}</td>`:''}</tr>`).join('')}</tbody></table></div>`}
@@ -121,6 +121,51 @@
     $('issue-bars').innerHTML=popular.length?popular.map(([label,count])=>`<div class="bar-row"><span>${safe(label)}</span><span class="bar-track"><span class="bar-fill" style="display:block;width:${100*count/max}%"></span></span><b>${count}</b></div>`).join(''):'<div class="empty">Belum ada temuan pada periode ini.</div>';
     renderPhysical(rows);const warnings=rows.filter(r=>r.result.status==='BAD').slice(0,4);$('production-alerts').innerHTML=warnings.length?warnings.map(r=>`<div class="alert"><b>${safe(r.brand)} · ${safe(r.machine)} · ${r.type==='Maker'?'Rokok Batangan':'Packaging'} · ${safe(displayDate(r.date))} ${safe(r.time)}</b><br>${safe(r.result.issues.slice(0,3).join(' · '))}<br><span class="muted">Tindak lanjut: periksa setting mesin dan lakukan sampling ulang.</span></div>`).join(''):'<div class="alert ok">Tidak ada inspeksi BAD pada periode ini.</div>';
     $('recent-table').innerHTML=tableMarkup(rows.slice(0,8),false);
+  }
+  function stationBounds(prefix){
+    const period=$(`${prefix}-period`).value,selected=$(`${prefix}-period-date`).value||today();
+    if(period==='monthly'){
+      const month=$(`${prefix}-period-month`).value||today().slice(0,7);
+      return {start:`${month}-01`,end:`${month}-${String(new Date(+month.slice(0,4),+month.slice(5),0).getDate()).padStart(2,'0')}`,caption:new Intl.DateTimeFormat('id-ID',{month:'long',year:'numeric'}).format(dateOf(`${month}-01`))};
+    }
+    if(period==='weekly'){
+      const d=dateOf(selected);d.setDate(d.getDate()-(d.getDay()+6)%7);const start=dateKey(d);
+      d.setDate(d.getDate()+4);return {start,end:dateKey(d),caption:`Minggu kerja ${displayDate(start)} – ${displayDate(dateKey(d))} (Senin–Jumat)`};
+    }
+    return {start:selected,end:selected,caption:displayDate(selected)};
+  }
+  function renderStation(prefix){
+    const type=prefix==='maker'?'Maker':'Packer',bounds=stationBounds(prefix),brand=$(`${prefix}-chart-brand`).value,machine=$(`${prefix}-chart-machine`).value;
+    const rows=allRecords().filter(r=>r.type===type&&r.date>=bounds.start&&r.date<=bounds.end&&(brand==='ALL'||r.brand===brand)&&(machine==='ALL'||r.machine===machine));
+    const good=rows.filter(r=>r.result.status==='GOOD').length,bad=rows.length-good,inspected=rows.reduce((n,r)=>n+r.result.inspected,0),passes=rows.reduce((n,r)=>n+r.result.good,0);
+    $(`${prefix}-chart-caption`).textContent=`${bounds.caption} · ${brand==='ALL'?'Semua brand':brand} · ${machine==='ALL'?'Semua mesin':machine} · ${rows.length} inspeksi${$('show-demo').checked?' · termasuk data contoh':''}`;
+    $(`${prefix}-chart-total`).textContent=num(rows.length);$(`${prefix}-chart-good`).textContent=num(good);
+    $(`${prefix}-chart-bad`).textContent=num(bad);$(`${prefix}-chart-good-rate`).textContent=`${pct(good,rows.length)} dari inspeksi`;
+    $(`${prefix}-chart-rate`).textContent=`${pct(passes,inspected)} / ${pct(inspected-passes,inspected)}`;
+    const groups=new Map();
+    for(const r of rows.slice().reverse()){
+      const key=$(`${prefix}-period`).value==='daily'?r.time:r.date;
+      if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);
+    }
+    const points=[...groups].map(([key,items])=>({label:key.length===10?key.slice(5):key,value:100*items.filter(r=>r.result.status==='GOOD').length/items.length}));
+    $(`${prefix}-chart-trend`).innerHTML=chartLine(points,{percent:true});
+    const counts=new Map();for(const r of rows)for(const issue of r.result.issues){
+      const label=issue.split(':')[0].split(/ \d/)[0].slice(0,33);counts.set(label,(counts.get(label)||0)+1);
+    }
+    const issues=[...counts].sort((a,b)=>b[1]-a[1]).slice(0,6),max=issues[0]?.[1]||1;
+    $(`${prefix}-chart-issues`).innerHTML=issues.length?issues.map(([label,count])=>`<div class="bar-row"><span>${safe(label)}</span><span class="bar-track"><span class="bar-fill" style="display:block;width:${100*count/max}%"></span></span><b>${count}</b></div>`).join(''):'<div class="empty">Belum ada temuan pada periode ini.</div>';
+    if(prefix==='maker'){
+      const chartBrand=brand==='ALL'?'':brand;
+      $(`${prefix}-chart-physical`).innerHTML=chartBrand?Object.entries(PHYSICAL).map(([key,meta])=>{
+        const [lo,hi]=BRAND_SPECS[chartBrand][key],measured=rows.filter(r=>r.physical?.[key]!=null&&Number.isFinite(Number(r.physical[key]))).slice().reverse();
+        const avg=measured.length?measured.reduce((sum,r)=>sum+Number(r.physical[key]),0)/measured.length:null;
+        const samples=measured.map(r=>({value:Number(r.physical[key]),label:`${r.date.slice(5)} ${r.time} · ${r.machine}`}));
+        return `<article class="panel chart-panel"><div class="panel-title"><div><h3>${meta.label} · ${safe(chartBrand)}</h3><p>LSL ${num(lo)} · USL ${num(hi)} ${meta.unit}</p></div><div style="text-align:right"><b>${avg==null?'—':num(avg)+' '+meta.unit}</b><div class="tiny muted">Rata-rata · ${measured.length} titik</div></div></div><div class="plot">${chartLine(samples,{lo,hi,unit:meta.unit})}</div><div class="legend"><span>Aktual</span><span class="limit">Batas target</span><span class="outside">Out-Spec</span></div></article>`;
+      }).join(''):'<div class="panel"><p>Pilih satu brand pada filter Maker untuk melihat grafik Berat, Diameter, Pressure Drop, dan Ventilasi beserta batas targetnya.</p></div>';
+    }
+    const warnings=rows.filter(r=>r.result.status==='BAD').slice(0,3);
+    $(`${prefix}-chart-warning`).innerHTML=warnings.length?warnings.map(r=>`<div class="alert"><b>${safe(r.brand)} · ${safe(r.machine)} · ${safe(displayDate(r.date))} ${safe(r.time)}</b><br>${safe(r.result.issues.slice(0,3).join(' · '))}</div>`).join(''):'<div class="alert ok">Tidak ada inspeksi BAD pada periode ini.</div>';
+    $(`${prefix}-chart-recent`).innerHTML=tableMarkup(rows.slice(0,5),false);
   }
   function historyRows(){return allRecords().filter(r=>(!$('history-date').value||r.date===$('history-date').value)&&($('history-type').value==='ALL'||r.type===$('history-type').value)&&($('history-brand').value==='ALL'||r.brand===$('history-brand').value)&&($('history-status').value==='ALL'||r.result.status===$('history-status').value))}
   function renderHistory(){const rows=historyRows();$('history-count').textContent=`${num(rows.length)} inspeksi ditemukan · menampilkan maksimal 100 terbaru`;$('history-table').innerHTML=tableMarkup(rows.slice(0,100),canWrite())}
@@ -166,7 +211,7 @@
       const data=await window.skmApiRequest('/api/inspections');
       if(sequence!==loadSequence||currentUser?.id!==userId)return;
       manual=(data.inspections||[]).map(mapInspection);
-      renderDashboard();renderHistory();
+      renderDashboard();renderStation('maker');renderStation('packer');renderHistory();
       $('sync-status').textContent=`${num(manual.length)} inspeksi tersinkron · ${new Intl.DateTimeFormat('id-ID',{hour:'2-digit',minute:'2-digit'}).format(new Date())}`;
     }catch(error){
       if(sequence!==loadSequence||currentUser?.id!==userId)return;
@@ -268,6 +313,17 @@
     const now=today();
     $('period-date').value=now;$('period-month').value=now.slice(0,7);
     $('maker-date').value=now;$('packer-date').value=now;
+    for(const prefix of ['maker','packer']){
+      $(`${prefix}-period-date`).value=now;$(`${prefix}-period-month`).value=now.slice(0,7);
+      if(prefix==='maker')$(`${prefix}-chart-brand`).value='ARM';
+      ['period','period-date','period-month','chart-brand','chart-machine'].forEach(key=>{
+        $(`${prefix}-${key}`).addEventListener('change',()=>{
+          $(`${prefix}-day-wrap`).classList.toggle('hidden',$(`${prefix}-period`).value==='monthly');
+          $(`${prefix}-month-wrap`).classList.toggle('hidden',$(`${prefix}-period`).value!=='monthly');
+          renderStation(prefix);
+        });
+      });
+    }
     const hours=Array.from({length:24},(_,i)=>`${String((i+6)%24).padStart(2,'0')}:00`);
     ['maker-time','packer-time'].forEach(id=>$(id).innerHTML='<option value="">Pilih jam</option>'+hours.map(h=>`<option>${h}</option>`).join(''));
     $('physical-fields').innerHTML=Object.entries(PHYSICAL).map(([key,m])=>`<div class="field"><label for="maker-${key}">${m.label} (${m.unit})</label><input id="maker-${key}" type="number" step="${m.step}" min="0" placeholder="Nilai terukur"><span class="target" id="target-${key}">Pilih brand untuk melihat target</span></div>`).join('');
@@ -281,7 +337,7 @@
           $('month-wrap').classList.toggle('hidden',$('period').value!=='monthly');
         }
         if(id==='filter-brand'&&BRAND_SPECS[$('filter-brand').value])$('physical-brand').value=$('filter-brand').value;
-        renderDashboard();if($('history').classList.contains('active'))renderHistory();
+        renderDashboard();if(id==='show-demo'){renderStation('maker');renderStation('packer')};if($('history').classList.contains('active'))renderHistory();
       }));
     ['history-date','history-type','history-brand','history-status'].forEach(id=>$(id).addEventListener('change',renderHistory));
     $('history-clear').addEventListener('click',()=>{

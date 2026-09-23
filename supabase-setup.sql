@@ -1,4 +1,4 @@
--- QUALITY INSPECTION SKM v1.4.3
+-- QUALITY INSPECTION SKM v1.5.0
 -- Jalankan seluruh file ini di Supabase > SQL Editor > Run.
 -- Login mengikuti dashboard SKT: setup Admin pertama, username/password, dan role.
 
