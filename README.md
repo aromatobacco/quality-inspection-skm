@@ -1,82 +1,73 @@
-# Dashboard Quality Inspection SKM · v1.2
+# Dashboard Quality Inspection SKM · v1.4
 
-Paket ini berisi situs SKM mandiri untuk GitHub Pages. Inspeksi Maker dan Packaging disimpan di project Supabase **khusus SKM**. Dashboard harian, mingguan, bulanan, grafik physical, warning produksi, riwayat, dan ekspor CSV membaca data yang tersimpan di sana.
+Dashboard SKM mandiri untuk GitHub Pages dan Supabase, dengan alur login seperti dashboard SKT: **Setup Admin Pertama**, login username/password, serta empat tingkat akses.
 
-## Isi ZIP
+## File yang harus ada di GitHub
 
 | File | Kegunaan |
 | --- | --- |
-| `index.html` | Tampilan dan formulir dashboard SKM |
-| `skm-app.js` | Login, input, kalkulasi dan pembacaan data Supabase |
-| `supabase-config.js` | Tempat URL dan publishable key project SKM |
-| `supabase-setup.sql` | Tabel dan aturan akses database SKM |
-| `.nojekyll` | File pendukung GitHub Pages |
-| `README.md` | Panduan ini |
+| `index.html` | Tampilan login dan dashboard |
+| `skm-app.js` | Form, dashboard, grafik, serta pengelolaan akun |
+| `skm-api.js` | Penghubung aman antara halaman dan fungsi Supabase |
+| `supabase-config.js` | URL dan publishable key project SKM |
+| `.nojekyll` | Pendukung GitHub Pages |
 
-## 1. Buat project Supabase SKM
+`supabase-setup.sql` cukup dijalankan di Supabase. File itu tidak harus diunggah ke GitHub.
 
-Masuk ke [Supabase](https://supabase.com/dashboard), buat **project baru** khusus SKM. Jangan menggunakan project lama SKT (`tsojwuarbstnovotbpdz`). Dengan project terpisah, akun dan tabel SKT tidak terhubung otomatis ke SKM.
+## 1. Jalankan database Supabase
 
-## 2. Buat tabel dan aturan akses
+1. Buka project Supabase SKM.
+2. Pilih **SQL Editor → New query**.
+3. Salin seluruh isi `supabase-setup.sql`.
+4. Tempel lalu klik **Run**.
+5. Hasil akhirnya harus menampilkan `SETUP LOGIN DAN DATABASE SKM SELESAI`.
 
-Di project SKM, buka **SQL Editor** → buat query baru → salin seluruh isi `supabase-setup.sql` → klik **Run**. Jalankan skrip itu sekali; skrip aman dijalankan lagi jika tabel sudah ada. Database mempunyai dua tabel: `skm_members` untuk daftar akun yang diizinkan dan `skm_inspections` untuk data pemeriksaan.
+Skrip membuat tabel akun, sesi login, data inspeksi, dan fungsi API SKM. Password disimpan dalam bentuk hash, bukan teks asli. Tabel tidak dapat dibaca langsung memakai publishable key; akses hanya melalui fungsi yang memeriksa sesi dan role.
 
-## 3. Buat akun QC lalu beri akses
+## 2. Upload file ke GitHub
 
-Di project SKM, buka **Authentication → Users**, tambah pengguna dengan email dan password. Pastikan akunnya sudah dikonfirmasi agar bisa login dengan password.
+Unggah atau replace file berikut pada root repository `quality-inspection-skm`:
 
-Kembali ke **SQL Editor**, jalankan contoh berikut dengan **email akun yang baru dibuat**. Ubah nama dan peran sesuai kebutuhan:
+- `index.html`
+- `skm-app.js`
+- `skm-api.js`
+- `supabase-config.js`
+- `.nojekyll`
 
-```sql
-insert into public.skm_members (user_id, display_name, role, is_active)
-select id, 'Natasya Shalomita', 'ADMIN', true
-from auth.users
-where email = 'email-admin-skm@example.com'
-on conflict (user_id) do update set
-  display_name = excluded.display_name,
-  role = excluded.role,
-  is_active = excluded.is_active;
-```
+Pastikan nama file persis sama dan tidak berubah menjadi `(1)` atau `(2)`.
 
-Untuk setiap anggota tim SKM lain, ulangi perintah yang sama dengan email masing-masing. Nilai `role`:
+## 3. Buat Admin pertama
 
-| Peran | Akses |
+1. Buka halaman GitHub Pages SKM.
+2. Klik **Setup Admin Pertama**.
+3. Isi nama Admin, username, dan password minimal 8 karakter yang mengandung huruf dan angka.
+4. Klik **Buat Admin Pertama**.
+5. Admin otomatis masuk ke dashboard.
+
+Setup hanya dapat dilakukan satu kali. Setelah akun pertama terbentuk, tombol setup akan hilang.
+
+## 4. Buat akun tim
+
+Admin membuka menu **Pengaturan**, lalu mengisi nama, username, password sementara, dan role:
+
+| Role | Akses |
 | --- | --- |
-| `ADMIN` | Lihat semua, isi, hapus semua inspeksi |
-| `QC` | Lihat semua, isi, hapus inspeksi yang dibuat sendiri |
-| `VIEWER` | Hanya lihat dashboard, riwayat dan unduh CSV |
+| `ADMIN` | Dashboard, input, riwayat, hapus data, dan kelola akun |
+| `INSPECTOR` | Dashboard, input, riwayat, serta hapus data miliknya sendiri |
+| `GUEST_INTERNAL` | Viewer internal: melihat Dashboard dan Data Inspeksi, tanpa input, hapus, atau Pengaturan |
+| `GUEST_EXTERNAL` | Viewer eksternal: hanya melihat Dashboard dan data akumulasi |
 
-Periksa hasilnya dengan `select display_name, role, is_active from public.skm_members;`. Akun yang belum masuk daftar anggota atau sudah dinonaktifkan tidak dapat membaca data SKM. Halaman tidak menyediakan pendaftaran akun sendiri.
+Admin dapat menonaktifkan akun tanpa menghapus histori inspeksinya. Login dapat digunakan pada beberapa perangkat; setiap sesi berakhir setelah 12 jam.
 
-## 4. Isi koneksi Supabase
+## 5. Cek cepat
 
-Di dashboard **project SKM**, temukan **Project URL** dan **publishable key** di pengaturan API. Edit `supabase-config.js`:
+1. Login sebagai Admin.
+2. Buat satu akun QC Inspector di Pengaturan.
+3. Login menggunakan akun QC dan simpan satu inspeksi Maker atau Packaging.
+4. Klik **Segarkan** dan pastikan data tampil di dashboard.
+5. Login sebagai Guest Internal dan pastikan Dashboard serta Data Inspeksi terlihat.
+6. Login sebagai Guest External dan pastikan hanya menu Dashboard yang terlihat.
 
-```js
-window.SKM_SUPABASE_CONFIG = {
-  url: 'https://nama-project-skm.supabase.co',
-  publishableKey: 'sb_publishable_...'
-};
-```
+Jika halaman menyebut database belum siap, jalankan kembali `supabase-setup.sql` versi v1.4. File lama `skm_members` dan `skm_inspections`, bila pernah dibuat, tidak dihapus; versi ini memakai tabel baru agar data lama tidak rusak.
 
-Gunakan **publishable key** project SKM. Jangan pernah menaruh *secret key* atau *service_role key* di situs. Publishable key dapat dilihat pengunjung halaman; akses data ditentukan oleh login dan kebijakan Row Level Security (RLS) di `supabase-setup.sql`.
-
-## 5. Unggah ke GitHub Pages
-
-Pada repository GitHub **SKM** yang ingin dipakai, unggah empat file ini ke direktori utama repository: `index.html`, `skm-app.js`, `supabase-config.js`, `.nojekyll`. Boleh juga unggah `README.md`; file SQL hanya perlu dijalankan di Supabase dan tidak diperlukan oleh situs.
-
-Di repository, buka **Settings → Pages** → pilih **Deploy from a branch** → branch `main` → folder `/ (root)` → **Save**. Setelah Pages terbit, buka tautan situsnya, login dengan akun SKM, lalu mulai mengisi inspeksi.
-
-Untuk mencoba lokal: dari folder berisi `index.html`, jalankan `python -m http.server 8000` lalu buka `http://localhost:8000`.
-
-## Cek cepat setelah pemasangan
-
-1. Login menggunakan akun yang tercantum pada `skm_members`.
-2. Isi satu inspeksi Maker atau Packaging, kemudian simpan.
-3. Klik **Segarkan**; inspeksi akan muncul di dashboard dan Data Inspeksi.
-4. Buka link yang sama di perangkat lain dengan akun SKM lain; inspeksinya akan tampil juga.
-5. Coba akun tanpa keanggotaan SKM; data tidak boleh terbuka.
-
-Data contoh **tidak aktif secara default**, hanya contoh tampilan jika kotak *Tampilkan data contoh* dicentang; tidak masuk database. Riwayat yang sebelumnya tersimpan di `localStorage` pada halaman lama **tidak otomatis dipindahkan** ke Supabase. Situs pada GitHub Pages tetap dapat dibuka hingga halaman login oleh siapa pun yang mempunyai link; **data SKM baru terlihat setelah login akun yang mendapat akses**. Situs membutuhkan internet untuk library Supabase dan koneksi database.
-
-Developed @MT2026 · Last Version: v1.2 · 22 September 2026.
+Developed @MT2026 · Last Version: v1.4 · 23 September 2026.

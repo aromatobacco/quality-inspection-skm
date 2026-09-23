@@ -13,9 +13,9 @@
   const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const showToast=s=>{const el=$('toast');el.textContent=s;el.classList.add('show');clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>el.classList.remove('show'),4400)};
   let manual=[];
-  let client=null,currentUser=null,currentMember=null,loadSequence=0,activeSession=0;
-  const canWrite=()=>currentMember?.role==='QC'||currentMember?.role==='ADMIN';
-  const canDelete=r=>r.source!=='Contoh'&&(currentMember?.role==='ADMIN'||(currentMember?.role==='QC'&&r.authorId===currentUser?.id));
+  let currentUser=null,managedUsers=[],loadSequence=0,activeSession=0;
+  const canWrite=()=>currentUser?.role==='INSPECTOR'||currentUser?.role==='ADMIN';
+  const canDeleteRecord=r=>r.source!=='Contoh'&&(currentUser?.role==='ADMIN'||(currentUser?.role==='INSPECTOR'&&r.authorId===currentUser?.id));
 
   function assess(r){
     const issues=[];let inspected=0,good=0;
@@ -76,8 +76,18 @@
     $(`${prefix}-in`).textContent=`In-Spec ${pct(a.good,a.inspected)}`;$(`${prefix}-out`).textContent=`Out-Spec ${pct(a.inspected-a.good,a.inspected)}`;
     names.forEach((name,i)=>{const v=r.visual[name],el=$(`${prefix}-result-${i}`);el.textContent=v==null||!r.sample?'In-Spec — · Out-Spec —':`In-Spec ${pct(v,r.sample)} · Out-Spec ${pct(r.sample-v,r.sample)}`;el.style.color=v!=null&&v<r.sample?'#ff9cae':'#bdeed8';const inp=$(`${prefix}-${i}`);inp.max=String(r.sample||10000)});
   }
-  function showView(id){if(['maker','packer'].includes(id)&&!canWrite())return;document.querySelectorAll('.section').forEach(el=>el.classList.toggle('active',el.id===id));document.querySelectorAll('.nav-button').forEach(el=>{if(el.dataset.view===id)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current')});const info={dashboard:['Ringkasan Produksi SKM','Dashboard harian, mingguan, dan bulanan untuk Maker dan Packaging dalam satu halaman.'],maker:['Maker Station · Rokok Batangan','Catat pemeriksaan physical dan jumlah batang baik per parameter visual.'],packer:['Packer Station · Packaging','Catat jumlah pack baik, lalu lihat status GOOD atau BAD otomatis.'],history:['Data Inspeksi SKM','Telusuri semua hasil inspeksi dari periode dan bagian SKM.']};$('view-title').textContent=info[id][0];$('view-description').textContent=info[id][1];if(id==='dashboard')renderDashboard();if(id==='history')renderHistory();window.scrollTo({top:0,behavior:'smooth'})}
-  function tableMarkup(rows,canDelete){if(!rows.length)return '<div class="empty">Belum ada inspeksi pada filter yang dipilih.</div>';return `<div class="table-wrap"><table><thead><tr><th>Tanggal / Jam</th><th>Bagian</th><th>Brand / Mesin</th><th>QC / Shift</th><th>In / Out</th><th>Hasil</th><th>Temuan / Keterangan</th><th>Sumber</th>${canDelete?'<th>Aksi</th>':''}</tr></thead><tbody>${rows.map(r=>`<tr><td>${safe(displayDate(r.date))}<br><span class="muted">${safe(r.time)}</span></td><td>${r.type==='Maker'?'Rokok Batangan':'Packaging'}</td><td><b>${safe(r.brand)}</b><br>${safe(r.machine)}</td><td>${safe(r.qc)}<br><span class="muted">${safe(r.shift)}</span></td><td>${pct(r.result.good,r.result.inspected)} / ${pct(r.result.inspected-r.result.good,r.result.inspected)}</td><td><span class="tag ${r.result.status==='GOOD'?'good':'bad'}">${r.result.status}</span></td><td>${safe(r.result.issues.slice(0,2).join('; ')||r.trouble||r.notes||'Tidak ada temuan')} ${r.result.issues.length>2?`(+${r.result.issues.length-2} lainnya)`:''}</td><td><span class="tag ${r.source==='Contoh'?'demo':'local'}">${safe(r.source||'Tersimpan')}</span></td>${canDelete?`<td>${canDelete(r)?`<button type="button" class="delete" data-delete="${safe(r.id)}" aria-label="Hapus inspeksi">Hapus</button>`:'—'}</td>`:''}</tr>`).join('')}</tbody></table></div>`}
+  function showView(id){
+    if(['maker','packer'].includes(id)&&!canWrite())return;
+    if(currentUser?.role==='GUEST_EXTERNAL'&&id!=='dashboard')return;
+    if(id==='settings'&&currentUser?.role!=='ADMIN')return;
+    document.querySelectorAll('.section').forEach(el=>el.classList.toggle('active',el.id===id));
+    document.querySelectorAll('.nav-button').forEach(el=>{if(el.dataset.view===id)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current')});
+    const info={dashboard:['Ringkasan Produksi SKM','Dashboard harian, mingguan, dan bulanan untuk Maker dan Packaging dalam satu halaman.'],maker:['Maker Station · Rokok Batangan','Catat pemeriksaan physical dan jumlah batang baik per parameter visual.'],packer:['Packer Station · Packaging','Catat jumlah pack baik, lalu lihat status GOOD atau BAD otomatis.'],history:['Data Inspeksi SKM','Telusuri semua hasil inspeksi dari periode dan bagian SKM.'],settings:['Pengaturan Akun SKM','Kelola akses Admin, QC Inspector, dan Guest seperti dashboard SKT.']};
+    $('view-title').textContent=info[id][0];$('view-description').textContent=info[id][1];
+    if(id==='dashboard')renderDashboard();if(id==='history')renderHistory();if(id==='settings')loadUsers();
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+  function tableMarkup(rows,includeActions){if(!rows.length)return '<div class="empty">Belum ada inspeksi pada filter yang dipilih.</div>';return `<div class="table-wrap"><table><thead><tr><th>Tanggal / Jam</th><th>Bagian</th><th>Brand / Mesin</th><th>QC / Shift</th><th>In / Out</th><th>Hasil</th><th>Temuan / Keterangan</th><th>Sumber</th>${includeActions?'<th>Aksi</th>':''}</tr></thead><tbody>${rows.map(r=>`<tr><td>${safe(displayDate(r.date))}<br><span class="muted">${safe(r.time)}</span></td><td>${r.type==='Maker'?'Rokok Batangan':'Packaging'}</td><td><b>${safe(r.brand)}</b><br>${safe(r.machine)}</td><td>${safe(r.qc)}<br><span class="muted">${safe(r.shift)}</span></td><td>${pct(r.result.good,r.result.inspected)} / ${pct(r.result.inspected-r.result.good,r.result.inspected)}</td><td><span class="tag ${r.result.status==='GOOD'?'good':'bad'}">${r.result.status}</span></td><td>${safe(r.result.issues.slice(0,2).join('; ')||r.trouble||r.notes||'Tidak ada temuan')} ${r.result.issues.length>2?`(+${r.result.issues.length-2} lainnya)`:''}</td><td><span class="tag ${r.source==='Contoh'?'demo':'local'}">${safe(r.source||'Tersimpan')}</span></td>${includeActions?`<td>${canDeleteRecord(r)?`<button type="button" class="delete" data-delete="${safe(r.id)}" aria-label="Hapus inspeksi">Hapus</button>`:'—'}</td>`:''}</tr>`).join('')}</tbody></table></div>`}
   function chartLine(points,{lo,hi,unit='',percent=false}={}){
     if(!points.length)return '<div class="empty" style="width:100%">Belum ada pengukuran untuk filter ini.</div>';
     const w=560,h=176,left=43,right=14,top=15,bottom=26,vals=points.map(p=>p.value),vmin=percent?0:Math.min(lo,...vals),vmax=percent?100:Math.max(hi,...vals),span=Math.max(1,(vmax-vmin)*.17),min=percent?0:vmin-span,max=percent?100:vmax+span;
@@ -113,60 +123,54 @@
     $('recent-table').innerHTML=tableMarkup(rows.slice(0,8),false);
   }
   function historyRows(){return allRecords().filter(r=>(!$('history-date').value||r.date===$('history-date').value)&&($('history-type').value==='ALL'||r.type===$('history-type').value)&&($('history-brand').value==='ALL'||r.brand===$('history-brand').value)&&($('history-status').value==='ALL'||r.result.status===$('history-status').value))}
-  function renderHistory(){const rows=historyRows();$('history-count').textContent=`${num(rows.length)} inspeksi ditemukan · menampilkan maksimal 100 terbaru`;$('history-table').innerHTML=tableMarkup(rows.slice(0,100),true)}
+  function renderHistory(){const rows=historyRows();$('history-count').textContent=`${num(rows.length)} inspeksi ditemukan · menampilkan maksimal 100 terbaru`;$('history-table').innerHTML=tableMarkup(rows.slice(0,100),canWrite())}
   function exportCSV(){const rows=historyRows();if(!rows.length){showToast('Tidak ada data pada filter untuk diekspor.');return}const header=['Tanggal','Jam','Bagian','Nama QC','Shift','Brand','Mesin','Jumlah Sampel','In-Spec','Out-Spec','Status','Temuan','Trouble Point','Keterangan','Sumber'],q=v=>`"${String(v??'').replace(/"/g,'""')}"`,lines=[header,...rows.map(r=>[r.date,r.time,r.type==='Maker'?'Rokok Batangan':'Packaging',r.qc,r.shift,r.brand,r.machine,r.sample,pct(r.result.good,r.result.inspected),pct(r.result.inspected-r.result.good,r.result.inspected),r.result.status,r.result.issues.join('; '),r.trouble,r.notes,r.source||'Tersimpan'])];const blob=new Blob(['\uFEFF'+lines.map(line=>line.map(q).join(',')).join('\r\n')],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`inspeksi-skm-${today()}.csv`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)}
   function mapInspection(row){
     return {
-      id:row.id,authorId:row.author_id,source:'Supabase',type:row.station,
-      date:row.sample_date,time:String(row.sample_time).slice(0,5),qc:row.qc_name,
-      shift:row.shift,brand:row.brand,machine:row.machine,sample:row.sample_count,
-      physical:row.physical||{},visual:row.visual||{},noFinding:row.no_finding,
-      trouble:row.trouble_point||'',notes:row.notes||'',code:row.production_code||'',
-      cigarettes:row.cigarettes_per_pack??'',packCount:row.pack_count??''
+      id:row.id,authorId:row.authorId,source:row.source||'Supabase',type:row.type,
+      date:row.date,time:String(row.time).slice(0,5),qc:row.qc,
+      shift:row.shift,brand:row.brand,machine:row.machine,sample:Number(row.sample),
+      physical:row.physical||{},visual:row.visual||{},noFinding:Boolean(row.noFinding),
+      trouble:row.trouble||'',notes:row.notes||'',code:row.code||'',
+      cigarettes:row.cigarettes??'',packCount:row.packCount??''
     };
   }
 
   function toDatabase(r){
     return {
-      author_id:currentUser.id,station:r.type,sample_date:r.date,sample_time:r.time,
-      qc_name:r.qc,shift:r.shift,brand:r.brand,machine:r.machine,
-      sample_count:r.sample,physical:r.physical,visual:r.visual,no_finding:r.noFinding,
-      trouble_point:r.trouble,notes:r.notes,production_code:r.code,
-      cigarettes_per_pack:r.cigarettes===''?null:Number(r.cigarettes),
-      pack_count:r.packCount===''?null:Number(r.packCount)
+      type:r.type,date:r.date,time:r.time,shift:r.shift,brand:r.brand,machine:r.machine,
+      sample:r.sample,physical:r.physical,visual:r.visual,noFinding:r.noFinding,
+      trouble:r.trouble,notes:r.notes,code:r.code,
+      cigarettes:r.cigarettes===''?'':Number(r.cigarettes),
+      packCount:r.packCount===''?'':Number(r.packCount)
     };
   }
 
-  function showAuth(message='Masukkan email dan kata sandi akun SKM.'){
+  function showAuth(message='Masukkan username dan kata sandi akun SKM.',needsBootstrap=false){
     activeSession++;
-    currentUser=null;currentMember=null;manual=[];
+    currentUser=null;managedUsers=[];manual=[];
     document.body.classList.remove('authenticated');
     $('app-root').classList.add('hidden');
     $('auth-screen').classList.remove('hidden');
     $('auth-message').textContent=message;
     $('login-password').value='';
+    $('setup-toggle').classList.toggle('hidden',!needsBootstrap);
+    if(!needsBootstrap)$('setup-form').classList.add('hidden');
   }
 
   async function loadRecords(){
-    if(!currentUser||!currentMember)return;
+    if(!currentUser)return;
     const sequence=++loadSequence,userId=currentUser.id;
     $('sync-status').textContent='Mengambil data SKM dari Supabase…';
     try{
-      const fetched=[];let start=0;
-      while(true){
-        const {data,error}=await client.from('skm_inspections').select('*')
-          .order('sample_date',{ascending:false}).order('sample_time',{ascending:false})
-          .order('id',{ascending:false}).range(start,start+999);
-        if(error)throw error;
-        if(sequence!==loadSequence||currentUser?.id!==userId)return;
-        fetched.push(...data);start+=data.length;
-        if(data.length<1000)break;
-      }
-      manual=fetched.map(mapInspection);
+      const data=await window.skmApiRequest('/api/inspections');
+      if(sequence!==loadSequence||currentUser?.id!==userId)return;
+      manual=(data.inspections||[]).map(mapInspection);
       renderDashboard();renderHistory();
       $('sync-status').textContent=`${num(manual.length)} inspeksi tersinkron · ${new Intl.DateTimeFormat('id-ID',{hour:'2-digit',minute:'2-digit'}).format(new Date())}`;
     }catch(error){
       if(sequence!==loadSequence||currentUser?.id!==userId)return;
+      if(Number(error.status)===401){showAuth('Sesi berakhir. Silakan login kembali.');return}
       $('sync-status').textContent='Gagal memuat data. Klik Segarkan untuk mencoba lagi.';
       showToast(`Gagal membaca data: ${error.message||error}`);
     }
@@ -174,22 +178,14 @@
 
   async function activateSession(user){
     if(!user){showAuth();return}
-    if(currentUser?.id===user.id&&currentMember)return;
-    const session=++activeSession;
-    $('auth-message').textContent='Memeriksa akses SKM…';
-    const {data:member,error}=await client.from('skm_members')
-      .select('display_name,role,is_active').eq('user_id',user.id).maybeSingle();
-    if(session!==activeSession)return;
-    if(error){showAuth(`Koneksi anggota gagal: ${error.message}`);return}
-    if(!member||!member.is_active){
-      showAuth('Akun ini belum diberi akses SKM. Minta admin mendaftarkannya di skm_members.');
-      await client.auth.signOut();
-      return;
-    }
-    currentUser=user;currentMember=member;
-    $('user-label').textContent=`${member.display_name} · ${member.role}`;
+    currentUser=user;
+    const roleLabel={ADMIN:'Admin',INSPECTOR:'QC Inspector',GUEST_INTERNAL:'Guest Internal',GUEST_EXTERNAL:'Guest External'}[user.role]||user.role;
+    $('user-label').textContent=`${user.displayName} · ${roleLabel}`;
+    for(const id of ['maker-qc','packer-qc']){$(id).value=user.displayName;$(id).readOnly=true}
     document.querySelectorAll('.tabs .nav-button[data-view="maker"],.tabs .nav-button[data-view="packer"]')
       .forEach(button=>button.classList.toggle('hidden',!canWrite()));
+    $('history-nav').classList.toggle('hidden',user.role==='GUEST_EXTERNAL');
+    $('settings-nav').classList.toggle('hidden',user.role!=='ADMIN');
     document.body.classList.add('authenticated');
     $('auth-screen').classList.add('hidden');
     $('app-root').classList.remove('hidden');
@@ -198,30 +194,13 @@
   }
 
   async function initializeBackend(){
-    const config=window.SKM_SUPABASE_CONFIG||{};
-    if(!/^https:\/\//.test(config.url||'')||!config.publishableKey||
-       /YOUR|PASTE/i.test(config.url+' '+config.publishableKey)){
-      $('auth-message').textContent='Isi URL dan publishable key project SKM di supabase-config.js terlebih dahulu.';
-      $('login-button').disabled=true;
-      return;
-    }
-    if(!window.supabase?.createClient){
-      $('auth-message').textContent='Library Supabase gagal dimuat. Periksa internet, lalu muat ulang halaman.';
-      $('login-button').disabled=true;
-      return;
-    }
     try{
-      client=window.supabase.createClient(config.url,config.publishableKey);
-      const {data,error}=await client.auth.getSession();
-      if(error)throw error;
-      if(data.session?.user)await activateSession(data.session.user);
-      else showAuth();
-      client.auth.onAuthStateChange((event,session)=>{
-        if(event==='SIGNED_OUT')showAuth();
-        if(event==='SIGNED_IN'&&session?.user)setTimeout(()=>activateSession(session.user),0);
-      });
+      if(typeof window.skmApiRequest!=='function')throw new Error('File skm-api.js belum dimuat.');
+      const status=await window.skmApiRequest('/api/auth/status');
+      if(status.user)await activateSession(status.user);
+      else showAuth(status.needsBootstrap?'Belum ada akun. Klik Setup Admin Pertama.':undefined,Boolean(status.needsBootstrap));
     }catch(error){
-      showAuth(`Tidak dapat terhubung ke Supabase: ${error.message||error}`);
+      showAuth(`Tidak dapat menyiapkan login: ${error.message||error}`);
     }
   }
 
@@ -234,11 +213,11 @@
     const submit=form.querySelector('[type="submit"]');
     submit.disabled=true;submit.textContent='Menyimpan…';
     try{
-      const {error}=await client.from('skm_inspections').insert(toDatabase(r));
-      if(error)throw error;
+      await window.skmApiRequest('/api/inspections',{method:'POST',body:toDatabase(r)});
       form.reset();
       const prefix=type==='Maker'?'maker':'packer';
       $(`${prefix}-date`).value=today();$(`${prefix}-sample`).value='10';
+      $(`${prefix}-qc`).value=currentUser.displayName;
       if(type==='Maker')updateTargets();updateForm(type);
       showToast(`Inspeksi ${type==='Maker'?'Rokok Batangan':'Packaging'} ${assessment.status} tersimpan di Supabase.`);
       await loadRecords();
@@ -248,15 +227,40 @@
 
   async function removeInspection(id){
     const record=manual.find(r=>r.id===id);
-    if(!record||!canDelete(record))return;
+    if(!record||!canDeleteRecord(record))return;
     if(!confirm('Hapus inspeksi ini dari Supabase untuk seluruh tim SKM?'))return;
     try{
-      const {data,error}=await client.from('skm_inspections').delete().eq('id',id).select('id');
-      if(error)throw error;
-      if(!data?.length)throw new Error('Data tidak terhapus. Periksa izin akun.');
+      await window.skmApiRequest(`/api/inspections/${id}`,{method:'DELETE'});
       showToast('Inspeksi dihapus dari Supabase.');
       await loadRecords();
     }catch(error){showToast(`Gagal menghapus data: ${error.message||error}`)}
+  }
+
+  function renderUsers(){
+    if(!managedUsers.length){$('users-list').innerHTML='<div class="empty">Belum ada akun.</div>';return}
+    const labels={ADMIN:'Admin',INSPECTOR:'QC Inspector',GUEST_INTERNAL:'Guest Internal',GUEST_EXTERNAL:'Guest External'};
+    $('users-list').innerHTML=managedUsers.map(user=>`<div class="alert ${user.isActive?'ok':''}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><b>${safe(user.displayName)}</b><br><span class="muted">@${safe(user.username)} · ${safe(labels[user.role]||user.role)}</span></div><button type="button" class="secondary" data-user-toggle="${safe(user.id)}" data-active="${user.isActive}">${user.isActive?'Nonaktifkan':'Aktifkan'}</button></div></div>`).join('');
+  }
+
+  async function loadUsers(){
+    if(currentUser?.role!=='ADMIN')return;
+    $('users-list').innerHTML='<div class="empty">Memuat akun…</div>';
+    try{const data=await window.skmApiRequest('/api/users');managedUsers=data.users||[];renderUsers()}
+    catch(error){$('users-list').innerHTML=`<div class="alert">${safe(error.message||error)}</div>`}
+  }
+
+  async function createUser(){
+    const button=$('user-submit');button.disabled=true;button.textContent='Membuat…';
+    try{
+      await window.skmApiRequest('/api/users',{method:'POST',body:{displayName:$('user-name').value.trim(),username:$('user-username').value.trim(),password:$('user-password').value,role:$('user-role').value}});
+      $('user-form').reset();showToast('Akun pengguna berhasil dibuat.');await loadUsers();
+    }catch(error){showToast(`Gagal membuat akun: ${error.message||error}`)}
+    finally{button.disabled=false;button.textContent='Buat Akun'}
+  }
+
+  async function toggleUser(id,isActive){
+    try{await window.skmApiRequest(`/api/users/${id}`,{method:'PATCH',body:{isActive:!isActive}});showToast(`Akun berhasil ${isActive?'dinonaktifkan':'diaktifkan'}.`);await loadUsers()}
+    catch(error){showToast(`Gagal mengubah akun: ${error.message||error}`)}
   }
 
   function setup(){
@@ -292,25 +296,37 @@
       form.addEventListener('change',()=>{if(type==='Maker')updateTargets();updateForm(type)});
       form.addEventListener('reset',()=>setTimeout(()=>{
         $(`${prefix}-date`).value=today();$(`${prefix}-sample`).value='10';
+        if(currentUser)$(`${prefix}-qc`).value=currentUser.displayName;
         if(type==='Maker')updateTargets();updateForm(type);
       },0));
       form.addEventListener('submit',event=>{event.preventDefault();saveInspection(type,form)});
     }
     $('login-form').addEventListener('submit',async event=>{
-      event.preventDefault();if(!client)return;
+      event.preventDefault();
       const button=$('login-button');button.disabled=true;$('auth-message').textContent='Sedang masuk…';
       try{
-        const {error}=await client.auth.signInWithPassword({
-          email:$('login-email').value.trim(),password:$('login-password').value
-        });
-        if(error)throw error;
-        $('auth-message').textContent='Memeriksa akses SKM…';
+        const data=await window.skmApiRequest('/api/auth/login',{method:'POST',body:{username:$('login-username').value.trim(),password:$('login-password').value}});
+        await activateSession(data.user);
       }catch(error){$('auth-message').textContent=`Login gagal: ${error.message||error}`}
       finally{button.disabled=false}
     });
+    $('setup-toggle').addEventListener('click',()=>$('setup-form').classList.toggle('hidden'));
+    $('setup-form').addEventListener('submit',async event=>{
+      event.preventDefault();const button=$('setup-button');button.disabled=true;button.textContent='Membuat Admin…';$('auth-message').textContent='Menyiapkan Admin pertama…';
+      try{
+        const data=await window.skmApiRequest('/api/auth/bootstrap',{method:'POST',body:{displayName:$('setup-name').value.trim(),username:$('setup-username').value.trim(),password:$('setup-password').value}});
+        $('setup-form').reset();await activateSession(data.user);showToast('Admin pertama berhasil dibuat.');
+      }catch(error){$('auth-message').textContent=`Setup gagal: ${error.message||error}`}
+      finally{button.disabled=false;button.textContent='Buat Admin Pertama'}
+    });
     $('logout-button').addEventListener('click',async()=>{
-      const {error}=await client.auth.signOut();
-      if(error)showToast(`Gagal keluar: ${error.message}`);
+      try{await window.skmApiRequest('/api/auth/logout',{method:'POST'});showAuth('Kamu sudah keluar. Silakan login kembali.')}
+      catch(error){showToast(`Gagal keluar: ${error.message||error}`)}
+    });
+    $('user-form').addEventListener('submit',event=>{event.preventDefault();createUser()});
+    $('users-refresh').addEventListener('click',loadUsers);
+    $('users-list').addEventListener('click',event=>{
+      const button=event.target.closest('[data-user-toggle]');if(button)toggleUser(button.dataset.userToggle,button.dataset.active==='true');
     });
     $('refresh-data').addEventListener('click',loadRecords);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden&&currentUser)loadRecords()});
