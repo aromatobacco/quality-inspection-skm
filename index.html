@@ -130,6 +130,10 @@
     .auth-card .primary {width:100%;margin-top:12px;min-height:43px}
     .auth-card small {display:block;color:#dcc9e9;margin-top:16px}
     #auth-message {min-height:20px;color:#ffb9c9;font-size:12px;margin-top:12px}
+    #setup-toggle {display:block;width:100%;margin-top:12px;background:transparent;border:0;color:#d9baf0;font-size:11px;text-decoration:underline}
+    #setup-form {margin-top:16px;padding-top:16px;border-top:1px solid #534363}
+    #setup-form h2 {font-size:16px;margin:0 0 4px}
+    #setup-form p {font-size:11px;margin-bottom:12px}
     .account-controls {display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}
     .account-controls .secondary {padding:7px 9px;font-size:11px}
     #user-label {color:#f2ddff;font-size:11px;font-weight:700}
@@ -142,11 +146,20 @@
     <div class="auth-card">
       <span class="eyebrow">PT Aroma Tobacco Internasional · SKM</span>
       <h1>Quality Inspection SKM</h1>
-      <p>Masuk dengan akun QC SKM untuk melihat data inspeksi bersama.</p>
+      <p>Masuk menggunakan username dan password akun SKM.</p>
       <form id="login-form">
-        <div class="field"><label for="login-email">Email</label><input id="login-email" type="email" autocomplete="username" required placeholder="qc@perusahaan.com"></div>
+        <div class="field"><label for="login-username">Username</label><input id="login-username" type="text" autocomplete="username" required placeholder="Masukkan username"></div>
         <div class="field"><label for="login-password">Kata sandi</label><input id="login-password" type="password" autocomplete="current-password" required></div>
         <button id="login-button" type="submit" class="primary">Masuk</button>
+      </form>
+      <button id="setup-toggle" type="button" class="hidden">Setup Admin Pertama</button>
+      <form id="setup-form" class="hidden">
+        <h2>Setup Admin Pertama</h2>
+        <p>Form ini hanya dapat dipakai satu kali saat belum ada akun.</p>
+        <div class="field"><label for="setup-name">Nama Admin</label><input id="setup-name" type="text" required minlength="2" maxlength="80" placeholder="Natasya Shalomita"></div>
+        <div class="field"><label for="setup-username">Username Admin</label><input id="setup-username" type="text" required minlength="3" maxlength="40" pattern="[A-Za-z0-9._-]+" placeholder="natasya"></div>
+        <div class="field"><label for="setup-password">Password</label><input id="setup-password" type="password" required minlength="8" autocomplete="new-password" placeholder="Minimal 8 karakter, huruf dan angka"></div>
+        <button id="setup-button" type="submit" class="primary">Buat Admin Pertama</button>
       </form>
       <div id="auth-message" role="alert" aria-live="polite">Menyiapkan koneksi…</div>
       <small>Akses khusus tim SKM. Hubungi admin SKM jika belum memiliki akun.</small>
@@ -168,9 +181,10 @@
       <button type="button" class="nav-button" data-view="packer"><span class="nav-symbol" aria-hidden="true">▧</span><span class="nav-label">Packaging</span></button>
     </div>
     <div class="nav-group"><span class="nav-group-label">DATA</span>
-      <button type="button" class="nav-button" data-view="history"><span class="nav-symbol" aria-hidden="true">▤</span><span class="nav-label">Data Inspeksi</span></button>
+      <button type="button" id="history-nav" class="nav-button" data-view="history"><span class="nav-symbol" aria-hidden="true">▤</span><span class="nav-label">Data Inspeksi</span></button>
+      <button type="button" id="settings-nav" class="nav-button hidden" data-view="settings"><span class="nav-symbol" aria-hidden="true">⚙</span><span class="nav-label">Pengaturan</span></button>
     </div>
-    <div class="side-foot"><strong>Developed @MT2026</strong><br>Last Version: v1.2 · 22 September 2026</div>
+    <div class="side-foot"><strong>Developed @MT2026</strong><br>Last Version: v1.4 · 23 September 2026</div>
   </nav>
   <main class="shell">
     <div class="hero"><div><h2 id="view-title">Ringkasan Produksi SKM</h2><p id="view-description">Dashboard harian, mingguan, dan bulanan untuk Maker dan Packaging dalam satu halaman.</p></div><span class="flag">Sigaret Kretek Mesin</span></div>
@@ -207,12 +221,27 @@
     </form></section>
 
     <section id="history" class="section" aria-label="Data Inspeksi SKM"><div class="panel"><div class="panel-title"><div><h3>Data Inspeksi SKM</h3><p>Detail hasil Rokok Batangan dan Packaging. Data contoh ditandai terpisah.</p></div><button type="button" class="secondary" id="export-csv">Unduh CSV</button></div><div class="filter-row" style="margin-bottom:15px"><div class="field"><label for="history-date">Tanggal</label><input id="history-date" type="date"></div><div class="field"><label for="history-type">Bagian</label><select id="history-type"><option value="ALL">Semua bagian</option><option value="Maker">Rokok Batangan</option><option value="Packer">Packaging</option></select></div><div class="field"><label for="history-brand">Brand</label><select id="history-brand"><option value="ALL">Semua brand</option><option>AMB</option><option>AMT</option><option>ARM</option><option>ARB16</option><option>ARB12</option></select></div><div class="field"><label for="history-status">Status</label><select id="history-status"><option value="ALL">Semua status</option><option>GOOD</option><option>BAD</option></select></div><button type="button" id="history-clear" class="secondary">Reset Filter</button></div><div class="helper" id="history-count" style="margin-bottom:10px"></div><div id="history-table"></div></div></section>
+
+    <section id="settings" class="section" aria-label="Pengaturan akun SKM">
+      <div class="grid col2">
+        <form id="user-form" class="panel">
+          <div class="panel-title"><div><h3>Tambah Akun Pengguna</h3><p>Admin dapat membuat akun Inspector, Guest Internal, Guest External, atau Admin lain.</p></div><span class="tag demo">ADMIN</span></div>
+          <div class="field"><label for="user-name">Nama pengguna</label><input id="user-name" required minlength="2" maxlength="80" placeholder="Nama QC"></div>
+          <div class="field" style="margin-top:10px"><label for="user-username">Username</label><input id="user-username" required minlength="3" maxlength="40" pattern="[A-Za-z0-9._-]+" placeholder="qc.maker1"></div>
+          <div class="field" style="margin-top:10px"><label for="user-password">Password sementara</label><input id="user-password" type="password" required minlength="8" placeholder="Minimal 8 karakter, huruf dan angka"></div>
+          <div class="field" style="margin-top:10px"><label for="user-role">Role</label><select id="user-role"><option value="INSPECTOR">QC Inspector</option><option value="GUEST_INTERNAL">Guest Internal</option><option value="GUEST_EXTERNAL">Guest External</option><option value="ADMIN">Admin</option></select></div>
+          <button id="user-submit" type="submit" class="primary" style="width:100%;margin-top:16px">Buat Akun</button>
+        </form>
+        <div class="panel"><div class="panel-title"><div><h3>Akun Pengguna SKM</h3><p>Nonaktifkan akun untuk menghentikan akses tanpa menghapus riwayat inspeksi.</p></div><button type="button" id="users-refresh" class="secondary">Segarkan</button></div><div id="users-list" class="alert-list"><div class="empty">Memuat akun…</div></div></div>
+      </div>
+    </section>
   </main>
-  <footer class="foot"><span>PT Aroma Tobacco Internasional · Production Monitoring SKM</span><span><strong>Developed @MT2026</strong> · Last Version: <strong>v1.2</strong> · 22 September 2026</span></footer>
+  <footer class="foot"><span>PT Aroma Tobacco Internasional · Production Monitoring SKM</span><span><strong>Developed @MT2026</strong> · Last Version: <strong>v1.4</strong> · 23 September 2026</span></footer>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./supabase-config.js"></script>
+  <script src="./skm-api.js"></script>
   <script src="./skm-app.js"></script>
 </body>
 </html>
