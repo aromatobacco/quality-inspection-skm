@@ -249,6 +249,13 @@
     .station-banner h3 {margin:0;font-size:17px}.station-banner p {margin:3px 0 0;color:#d6c6de;font-size:11px}.station-banner .primary {flex:none;min-height:41px;padding:10px 16px}
     .station-form-area {scroll-margin-top:96px}.station-form-area .station-input-heading {margin-top:0}.station-input-heading .secondary {flex:none;min-height:39px}
     @media(max-width:600px){.station-banner {flex-wrap:wrap;padding:15px;gap:12px}.station-banner .primary {width:100%;min-height:46px}.station-banner h3{font-size:15px}.station-form-area{scroll-margin-top:125px}}
+    .dashboard-overview {margin-bottom:15px;background:linear-gradient(105deg,#231831,#453353);border-color:#6a4b80}
+    .dashboard-overview .eyebrow {color:#d2b6e7}.dashboard-overview h3 {margin:7px 0 5px;font-size:21px}
+    .dashboard-overview p {margin:0;color:#e0d0e7;font-size:12px;line-height:1.55}
+    .dashboard-overview.needs-attention {border-color:#b46a80;background:linear-gradient(105deg,#352032,#523044)}
+    .dashboard-overview.needs-attention h3 {color:#ffacbf}
+    .overall-details {margin-top:15px;align-items:stretch}.overall-details>.panel {min-height:180px}
+    @media(max-width:600px){.dashboard-overview h3{font-size:18px}.overall-details {grid-template-columns:1fr}}
   </style>
 </head>
 <body>
@@ -303,7 +310,7 @@
       <button type="button" id="history-nav" class="nav-button" data-view="history"><span class="nav-symbol" aria-hidden="true">▤</span><span class="nav-label">Data Inspeksi</span></button>
       <button type="button" id="settings-nav" class="nav-button hidden" data-view="settings"><span class="nav-symbol" aria-hidden="true">⚙</span><span class="nav-label">Pengaturan</span></button>
     </div>
-    <div class="side-foot"><strong>Developed @MT2026</strong><br>Last Version: v1.5.1 · 23 September 2026</div>
+    <div class="side-foot"><strong>Developed @MT2026</strong><br>Last Version: v1.6.0 · 23 September 2026</div>
   </nav>
   <main class="shell">
     <div class="hero"><div><h2 id="view-title">Ringkasan Produksi SKM</h2><p id="view-description">Dashboard harian, mingguan, dan bulanan untuk Maker dan Packaging dalam satu halaman.</p></div><span class="flag">Sigaret Kretek Mesin</span></div>
@@ -311,18 +318,16 @@
     <div id="sync-status" role="status" aria-live="polite">Memuat data SKM…</div>
 
     <section id="dashboard" class="section active" aria-label="Dashboard SKM">
-      <div class="panel" style="margin-bottom:15px"><div class="period-bar"><div class="field"><label for="period">Periode</label><select id="period"><option value="daily">Harian</option><option value="weekly">Mingguan (Senin–Jumat)</option><option value="monthly">Bulanan</option></select></div><div class="field date-field" id="day-wrap"><label for="period-date">Tanggal</label><input type="date" id="period-date"></div><div class="field date-field hidden" id="month-wrap"><label for="period-month">Bulan</label><input type="month" id="period-month"></div><div class="field"><label for="filter-brand">Brand</label><select id="filter-brand"><option value="ALL">Semua brand</option><option>AMB</option><option>AMT</option><option>ARM</option><option>ARB16</option><option>ARB12</option></select></div><div class="field"><label for="filter-station">Bagian</label><select id="filter-station"><option value="ALL">Semua bagian</option><option value="Maker">Rokok Batangan</option><option value="Packer">Packaging</option></select></div><label class="switch"><input id="show-demo" type="checkbox"> Tampilkan data contoh</label></div></div>
+      <div class="panel" style="margin-bottom:15px"><div class="period-bar"><div class="field"><label for="period">Periode</label><select id="period"><option value="daily">Harian</option><option value="weekly">Mingguan (Senin–Jumat)</option><option value="monthly">Bulanan</option></select></div><div class="field date-field" id="day-wrap"><label for="period-date">Tanggal</label><input type="date" id="period-date"></div><div class="field date-field hidden" id="month-wrap"><label for="period-month">Bulan</label><input type="month" id="period-month"></div><div class="field"><label for="filter-brand">Brand</label><select id="filter-brand"><option value="ALL">Semua brand</option><option>AMB</option><option>AMT</option><option>ARM</option><option>ARB16</option><option>ARB12</option></select></div><label class="switch"><input id="show-demo" type="checkbox"> Tampilkan data contoh</label></div></div>
       <p class="summary-strip" id="period-caption" aria-live="polite"></p>
+      <div class="panel dashboard-overview" role="status" aria-live="polite"><span class="eyebrow">RINGKASAN KESELURUHAN</span><h3 id="overall-status">Belum ada inspeksi</h3><p id="overall-description">Hasil gabungan Rokok Batangan dan Packaging akan tampil setelah inspeksi tersimpan.</p></div>
+      <div class="section-heading"><div><h3>Ringkasan tiap station</h3><p>Pilih station untuk melihat grafik parameter dan pemeriksaan lebih rinci.</p></div></div>
       <div class="grid col2 station-cards" aria-label="Ringkasan per stasiun">
         <button type="button" class="station-card" data-view="maker"><div class="station-card-top"><span class="station-card-icon" aria-hidden="true">◎</span><span aria-hidden="true">↗</span></div><span class="station-card-label">Rokok Batangan · Maker</span><span class="station-card-row"><strong id="maker-score">—</strong><span id="maker-out-score">Out: —</span></span><small id="maker-summary-count">0 pemeriksaan · overall In-Spec</small></button>
         <button type="button" class="station-card" data-view="packer"><div class="station-card-top"><span class="station-card-icon" aria-hidden="true">▧</span><span aria-hidden="true">↗</span></div><span class="station-card-label">Packaging · Packer</span><span class="station-card-row"><strong id="packer-score">—</strong><span id="packer-out-score">Out: —</span></span><small id="packer-summary-count">0 pemeriksaan · overall In-Spec</small></button>
       </div>
-      <div class="grid col4"><div class="panel metric"><span>Jumlah inspeksi</span><strong id="kpi-total">0</strong><small id="kpi-total-sub">Rokok batangan + packaging</small></div><div class="panel metric"><span>Produk GOOD</span><strong id="kpi-good" class="positive">0</strong><small id="kpi-good-sub">Inspeksi tanpa temuan</small></div><div class="panel metric"><span>Produk BAD · warning</span><strong id="kpi-bad" class="negative">0</strong><small id="kpi-bad-sub">Perlu tindakan produksi</small></div><div class="panel metric"><span>In-Spec / Out-Spec</span><strong id="kpi-rate">—</strong><small id="kpi-rate-sub">Berdasarkan parameter terukur</small></div></div>
-      <div class="grid col2" style="margin-top:15px"><div class="panel"><div class="panel-title"><div><h3>Tren hasil inspeksi</h3><p id="trend-subtitle">GOOD per waktu sampling</p></div><span id="trend-change" class="compare">—</span></div><div id="trend-chart" class="plot" aria-label="Grafik tren persentase GOOD"></div><div class="legend"><span>GOOD (%)</span></div></div><div class="panel"><div class="panel-title"><div><h3>Temuan yang sering muncul</h3><p>Jumlah inspeksi dengan parameter di luar batas</p></div></div><div id="issue-bars" class="simple-bars"></div></div></div>
-      <div class="section-heading"><div><h3>Physical Achievement Monitoring</h3><p>Nilai aktual (biru), batas bawah dan atas (kuning), titik keluar spesifikasi (merah).</p></div></div>
-      <div class="panel" style="margin-bottom:15px"><div class="filter-row"><div class="field"><label for="physical-brand">Brand pada grafik</label><select id="physical-brand"><option>ARM</option><option>AMB</option><option>AMT</option><option>ARB16</option><option>ARB12</option></select></div><div class="field"><label for="physical-machine">Mesin maker</label><select id="physical-machine"><option value="ALL">Semua mesin</option><option>M1</option><option>M2</option><option>M3</option><option>M4</option><option>M5</option></select></div><div class="field"><span>Keterangan</span><div class="helper" style="padding:5px 0">Grafik memakai hasil Maker dalam periode di atas. Arahkan kursor pada titik untuk melihat nilainya.</div></div></div></div>
-      <div class="chart-grid" id="physical-charts"></div>
-      <div class="section-heading"><div><h3>Warning untuk produksi</h3><p>Catatan otomatis dari inspeksi BAD pada periode pilihan.</p></div></div><div class="panel"><div id="production-alerts" class="alert-list"></div></div>
+      <div class="grid col4"><div class="panel metric"><span>Jumlah inspeksi</span><strong id="kpi-total">0</strong><small id="kpi-total-sub">Rokok batangan + packaging</small></div><div class="panel metric"><span>Inspeksi GOOD</span><strong id="kpi-good" class="positive">0</strong><small id="kpi-good-sub">Inspeksi tanpa temuan</small></div><div class="panel metric"><span>Inspeksi BAD · warning</span><strong id="kpi-bad" class="negative">0</strong><small id="kpi-bad-sub">Perlu tindakan produksi</small></div><div class="panel metric"><span>In-Spec / Out-Spec</span><strong id="kpi-rate">—</strong><small id="kpi-rate-sub">Berdasarkan parameter terukur</small></div></div>
+      <div class="grid col2 overall-details"><div class="panel"><div class="panel-title"><div><h3>Sebaran inspeksi per brand</h3><p>Jumlah total Maker dan Packaging menurut brand.</p></div></div><div id="overall-brand-bars" class="simple-bars"></div></div><div class="panel"><div class="panel-title"><div><h3>Perlu perhatian produksi</h3><p>Temuan BAD paling baru dari kedua station.</p></div></div><div id="production-alerts" class="alert-list"></div></div></div>
       <div class="section-heading"><div><h3>Aktivitas inspeksi terbaru</h3><p>Rokok Batangan dan Packaging</p></div><button type="button" class="secondary" data-view="history">Lihat semua data</button></div><div class="panel"><div id="recent-table"></div></div>
     </section>
 
@@ -380,12 +385,12 @@
       </div>
     </section>
   </main>
-  <footer class="foot"><span>PT Aroma Tobacco Internasional · Production Monitoring SKM</span><span><strong>Developed @MT2026</strong> · Last Version: <strong>v1.5.1</strong> · 23 September 2026</span></footer>
+  <footer class="foot"><span>PT Aroma Tobacco Internasional · Production Monitoring SKM</span><span><strong>Developed @MT2026</strong> · Last Version: <strong>v1.6.0</strong> · 23 September 2026</span></footer>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="./supabase-config.js?v=1.5.1"></script>
-  <script src="./skm-api.js?v=1.5.1"></script>
-  <script src="./skm-app.js?v=1.5.1"></script>
+  <script src="./supabase-config.js?v=1.6.0"></script>
+  <script src="./skm-api.js?v=1.6.0"></script>
+  <script src="./skm-app.js?v=1.6.0"></script>
 </body>
 </html>
