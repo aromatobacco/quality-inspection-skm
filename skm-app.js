@@ -76,6 +76,13 @@
     $(`${prefix}-in`).textContent=`In-Spec ${pct(a.good,a.inspected)}`;$(`${prefix}-out`).textContent=`Out-Spec ${pct(a.inspected-a.good,a.inspected)}`;
     names.forEach((name,i)=>{const v=r.visual[name],el=$(`${prefix}-result-${i}`);el.textContent=v==null||!r.sample?'In-Spec — · Out-Spec —':`In-Spec ${pct(v,r.sample)} · Out-Spec ${pct(r.sample-v,r.sample)}`;el.style.color=v!=null&&v<r.sample?'#ff9cae':'#bdeed8';const inp=$(`${prefix}-${i}`);inp.max=String(r.sample||10000)});
   }
+  function toggleStationForm(prefix,open,{scroll=true}={}){
+    $(`${prefix}-form-area`).classList.toggle('hidden',!open);
+    const button=document.querySelector(`[data-open-station="${prefix}"]`);
+    button.setAttribute('aria-expanded',String(open));
+    button.textContent=open?`✓  Form ${prefix==='maker'?'Rokok Batangan':'Packaging'} Terbuka`:`⊕  Input ${prefix==='maker'?'Rokok Batangan':'Packaging'}`;
+    if(scroll)(open?$(`${prefix}-form-area`):button).scrollIntoView({behavior:'smooth',block:'start'});
+  }
   function showView(id){
     if(['maker','packer'].includes(id)&&!canWrite())return;
     if(currentUser?.role==='GUEST_EXTERNAL'&&id!=='dashboard')return;
@@ -84,7 +91,7 @@
     document.querySelectorAll('.nav-button').forEach(el=>{if(el.dataset.view===id)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current')});
     const info={dashboard:['Ringkasan Produksi SKM','Dashboard harian, mingguan, dan bulanan untuk Maker dan Packaging dalam satu halaman.'],maker:['Maker Station · Rokok Batangan','Catat pemeriksaan physical dan jumlah batang baik per parameter visual.'],packer:['Packer Station · Packaging','Catat jumlah pack baik, lalu lihat status GOOD atau BAD otomatis.'],history:['Data Inspeksi SKM','Telusuri semua hasil inspeksi dari periode dan bagian SKM.'],settings:['Pengaturan Akun SKM','Kelola akses Admin, QC Inspector, dan Guest seperti dashboard SKT.']};
     $('view-title').textContent=info[id][0];$('view-description').textContent=info[id][1];
-    if(id==='dashboard')renderDashboard();if(id==='maker'||id==='packer')renderStation(id);if(id==='history')renderHistory();if(id==='settings')loadUsers();
+    if(id==='dashboard')renderDashboard();if(id==='maker'||id==='packer'){toggleStationForm(id,false,{scroll:false});renderStation(id)}if(id==='history')renderHistory();if(id==='settings')loadUsers();
     window.scrollTo({top:0,behavior:'smooth'});
   }
   function tableMarkup(rows,includeActions){if(!rows.length)return '<div class="empty">Belum ada inspeksi pada filter yang dipilih.</div>';return `<div class="table-wrap"><table><thead><tr><th>Tanggal / Jam</th><th>Bagian</th><th>Brand / Mesin</th><th>QC / Shift</th><th>In / Out</th><th>Hasil</th><th>Temuan / Keterangan</th><th>Sumber</th>${includeActions?'<th>Aksi</th>':''}</tr></thead><tbody>${rows.map(r=>`<tr><td>${safe(displayDate(r.date))}<br><span class="muted">${safe(r.time)}</span></td><td>${r.type==='Maker'?'Rokok Batangan':'Packaging'}</td><td><b>${safe(r.brand)}</b><br>${safe(r.machine)}</td><td>${safe(r.qc)}<br><span class="muted">${safe(r.shift)}</span></td><td>${pct(r.result.good,r.result.inspected)} / ${pct(r.result.inspected-r.result.good,r.result.inspected)}</td><td><span class="tag ${r.result.status==='GOOD'?'good':'bad'}">${r.result.status}</span></td><td>${safe(r.result.issues.slice(0,2).join('; ')||r.trouble||r.notes||'Tidak ada temuan')} ${r.result.issues.length>2?`(+${r.result.issues.length-2} lainnya)`:''}</td><td><span class="tag ${r.source==='Contoh'?'demo':'local'}">${safe(r.source||'Tersimpan')}</span></td>${includeActions?`<td>${canDeleteRecord(r)?`<button type="button" class="delete" data-delete="${safe(r.id)}" aria-label="Hapus inspeksi">Hapus</button>`:'—'}</td>`:''}</tr>`).join('')}</tbody></table></div>`}
@@ -264,6 +271,7 @@
       $(`${prefix}-date`).value=today();$(`${prefix}-sample`).value='10';
       $(`${prefix}-qc`).value=currentUser.displayName;
       if(type==='Maker')updateTargets();updateForm(type);
+      toggleStationForm(prefix,false);
       showToast(`Inspeksi ${type==='Maker'?'Rokok Batangan':'Packaging'} ${assessment.status} tersimpan di Supabase.`);
       await loadRecords();
     }catch(error){showToast(`Gagal menyimpan inspeksi: ${error.message||error}`)}
@@ -329,6 +337,8 @@
     $('physical-fields').innerHTML=Object.entries(PHYSICAL).map(([key,m])=>`<div class="field"><label for="maker-${key}">${m.label} (${m.unit})</label><input id="maker-${key}" type="number" step="${m.step}" min="0" placeholder="Nilai terukur"><span class="target" id="target-${key}">Pilih brand untuk melihat target</span></div>`).join('');
     buildVisual('maker-visuals',MAKER_VISUAL,'maker');buildVisual('packer-visuals',PACKER_VISUAL,'packer');
     document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>showView(button.dataset.view)));
+    document.querySelectorAll('[data-open-station]').forEach(button=>button.addEventListener('click',()=>toggleStationForm(button.dataset.openStation,true)));
+    document.querySelectorAll('[data-close-station]').forEach(button=>button.addEventListener('click',()=>toggleStationForm(button.dataset.closeStation,false)));
     $('sidebar-toggle').addEventListener('click',()=>{const hidden=document.body.classList.toggle('nav-collapsed');$('sidebar-toggle').setAttribute('aria-expanded',String(!hidden))});
     ['period','period-date','period-month','filter-brand','filter-station','show-demo','physical-brand','physical-machine']
       .forEach(id=>$(id).addEventListener('change',()=>{
