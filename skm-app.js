@@ -146,7 +146,7 @@
     };
   }
 
-  function showAuth(message='Masukkan username dan kata sandi akun SKM.',needsBootstrap=false){
+  function showAuth(message='',needsBootstrap=false){
     activeSession++;
     currentUser=null;managedUsers=[];manual=[];
     document.body.classList.remove('authenticated');
@@ -264,6 +264,7 @@
   }
 
   function setup(){
+    $('auth-ati-logo').src=$('ati-logo').src;
     const now=today();
     $('period-date').value=now;$('period-month').value=now.slice(0,7);
     $('maker-date').value=now;$('packer-date').value=now;
@@ -309,6 +310,13 @@
         await activateSession(data.user);
       }catch(error){$('auth-message').textContent=`Login gagal: ${error.message||error}`}
       finally{button.disabled=false}
+    });
+    $('login-password-toggle').addEventListener('click',()=>{
+      const input=$('login-password'),button=$('login-password-toggle'),show=input.type==='password';
+      input.type=show?'text':'password';
+      button.setAttribute('aria-pressed',String(show));
+      button.setAttribute('aria-label',show?'Sembunyikan password':'Tampilkan password');
+      input.focus();
     });
     $('setup-toggle').addEventListener('click',()=>$('setup-form').classList.toggle('hidden'));
     $('setup-form').addEventListener('submit',async event=>{
