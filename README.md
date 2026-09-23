@@ -1,4 +1,4 @@
-# Dashboard Quality Inspection SKM · v1.4
+# Dashboard Quality Inspection SKM · v1.4.1
 
 Dashboard SKM mandiri untuk GitHub Pages dan Supabase, dengan alur login seperti dashboard SKT: **Setup Admin Pertama**, login username/password, serta empat tingkat akses.
 
@@ -68,6 +68,6 @@ Admin dapat menonaktifkan akun tanpa menghapus histori inspeksinya. Login dapat 
 5. Login sebagai Guest Internal dan pastikan Dashboard serta Data Inspeksi terlihat.
 6. Login sebagai Guest External dan pastikan hanya menu Dashboard yang terlihat.
 
-Jika halaman menyebut database belum siap, jalankan kembali `supabase-setup.sql` versi v1.4. File lama `skm_members` dan `skm_inspections`, bila pernah dibuat, tidak dihapus; versi ini memakai tabel baru agar data lama tidak rusak.
+Jika halaman menyebut database belum siap, jalankan kembali `supabase-setup.sql` versi v1.4.1. File lama `skm_members` dan `skm_inspections`, bila pernah dibuat, tidak dihapus; versi ini memakai tabel baru agar data lama tidak rusak.
 
-Developed @MT2026 · Last Version: v1.4 · 23 September 2026.
+Developed @MT2026 · Last Version: v1.4.1 · 23 September 2026.
