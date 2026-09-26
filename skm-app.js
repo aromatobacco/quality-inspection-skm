@@ -3,7 +3,7 @@
   const BRAND_SPECS={ARB:{weight:[1.10,1.20],diameter:[7.42,7.52],pd:[90,100],vent:[20,30]},ARB12:{weight:[1.10,1.20],diameter:[7.42,7.52],pd:[90,100],vent:[20,30]},ARB16:{weight:[1.10,1.20],diameter:[7.42,7.52],pd:[90,100],vent:[20,30]},AMT:{weight:[.96,1.06],diameter:[6.92,7.02],pd:[115,125],vent:[23,33]},AMB:{weight:[.96,1.06],diameter:[6.92,7.02],pd:[115,125],vent:[23,33]},ARM:{weight:[.90,1.00],diameter:[6.92,7.02],pd:[105,115],vent:[27,37]}};
   const PHYSICAL={weight:{label:'Berat',unit:'g',step:'.001'},diameter:{label:'Diameter',unit:'mm',step:'.001'},pd:{label:'Pressure Drop',unit:'mmH₂O',step:'.01'},vent:{label:'Ventilasi',unit:'%',step:'.01'}};
   const MAKER_VISUAL=['Kemulusan','Panjang Cigarette','Ring','Pot Cig','Pot Fil','Lip CP','Lip CTP','Kropos','Gembos','Flaging','Blk. Ring','Cig non Filt','Spotting'];
-  const PACKER_VISUAL=['Kode Produksi','Smiling Pack','Top Flip Nguping','Scratch','Inner Frame','Embos','Lipt. Foil','Posisi Lem','Jumlah Cigarette','Pita Cukai','Tear Tape OPP','Access','Lipt OPP','MOP Berkerut','Posisi Pack','Teartape MOP','Lipt MOP','Jumlah Pack'];
+  const PACKER_VISUAL=['Smiling Pack','Top Flip Nguping','Scratch','Inner Frame','Embos','Lipt. Foil','Posisi Lem','Pita Cukai','Tear Tape OPP','Access','Lipt OPP','MOP Berkerut','Posisi Pack','Teartape MOP','Lipt MOP'];
   const today=()=>{const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-')};
   const dateOf=s=>new Date(`${s}T12:00:00`);
   const dateKey=d=>[d.getFullYear(),String(d.getMonth()+1).padStart(2,'0'),String(d.getDate()).padStart(2,'0')].join('-');
@@ -12,8 +12,15 @@
   const num=v=>v==null?'—':Number(v).toLocaleString('id-ID',{maximumFractionDigits:3});
   const safe=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const showToast=s=>{const el=$('toast');el.textContent=s;el.classList.add('show');clearTimeout(showToast.timer);showToast.timer=setTimeout(()=>el.classList.remove('show'),4400)};
+  const LEGACY_STATUS=[{label:'GOOD',min:71},{label:'FAIR',min:50},{label:'BAD',min:0}];
+  let master={brands:[...Object.entries(BRAND_SPECS).filter(([code])=>!['ARB12','ARB16'].includes(code)).map(([code,physicalLimits])=>({station:'Maker',code,physicalLimits})),...['AMB','AMT','ARM','ARB12','ARB16'].map(code=>({station:'Packer',code,physicalLimits:{}}))],visuals:[...MAKER_VISUAL.map(name=>({station:'Maker',name})),...PACKER_VISUAL.map(name=>({station:'Packer',name}))],statuses:LEGACY_STATUS};
+  const visualNames=type=>master.visuals.filter(x=>x.station===type).map(x=>x.name);
+  const rulesFor=r=>r.qualitySnapshot?.statusRules?.length?r.qualitySnapshot.statusRules:(r.id&&r.source!=='Contoh'?LEGACY_STATUS:master.statuses);
+  const boundsFor=r=>{const snapshot=r.qualitySnapshot?.physicalLimits;if(snapshot&&Object.keys(snapshot).length)return snapshot;const code=brandOf(r);return r.id&&r.source!=='Contoh'?(BRAND_SPECS[code]||{}):(master.brands.find(b=>b.station==='Maker'&&b.code===code)?.physicalLimits||BRAND_SPECS[code]||{})};
+  const statusTone=status=>status==='GOOD'?'good':status==='FAIR'?'fair':status==='BAD'?'bad':'pending';
+  const isTopStatus=r=>r.result.status===(rulesFor(r).slice().sort((a,b)=>Number(b.min)-Number(a.min))[0]?.label||'GOOD');
   let manual=[];
-  let currentUser=null,managedUsers=[],loadSequence=0,activeSession=0;
+  let currentUser=null,managedUsers=[],loadSequence=0,activeSession=0,onlineCount=0,offlineCount=0;
   const canWrite=()=>currentUser?.role==='INSPECTOR'||currentUser?.role==='ADMIN';
   const brandOf=r=>r.type==='Maker'&&/^ARB(?:12|16)$/.test(r.brand)?'ARB':r.brand;
   const displayBrand=r=>r.type==='Maker'?brandOf(r):r.brand==='ARB12'?'ARB 12':r.brand==='ARB16'?'ARB 16':r.brand;
@@ -23,22 +30,21 @@
     if(r.type==='Maker'&&r.machineTrouble){const valid=Boolean(r.trouble?.trim()&&r.notes?.trim());return {status:valid?'MACHINE TROUBLE':'INVALID',issues:valid?[]:['Isi trouble point dan keterangan.'],inspected:0,good:0}}
     const issues=[];let inspected=0,good=0;
     if(r.type==='Maker')for(const [key,meta] of Object.entries(PHYSICAL)){
-      const val=r.physical?.[key],bounds=BRAND_SPECS[brandOf(r)]?.[key];
-      if(val==null||val===''||!Number.isFinite(Number(val))||!bounds)continue;
-      inspected++;if(Number(val)>=bounds[0]&&Number(val)<=bounds[1])good++;
+      const val=r.physical?.[key],bounds=boundsFor(r)?.[key];if(val==null||val===''||!Array.isArray(bounds)||!Number.isFinite(Number(val)))continue;
+      inspected++;if(Number(val)>=Number(bounds[0])&&Number(val)<=Number(bounds[1]))good++;
       else issues.push(`${meta.label} ${num(val)} ${meta.unit} (target ${num(bounds[0])}–${num(bounds[1])})`);
     }
-    const sample=Number(r.sample),names=r.type==='Maker'?MAKER_VISUAL:PACKER_VISUAL;
-    if(Number.isInteger(sample)&&sample>0)for(const name of names){
-      const v=r.visual?.[name];if(v==null||v==='')continue;
-      const count=Number(v);if(!Number.isInteger(count)||count<0||count>sample)return {status:'INVALID',issues:[`${name}: jumlah baik harus 0–${sample}.`],inspected:0,good:0};
-      inspected+=sample;good+=count;
-      if(100*count/sample<71)issues.push(`${name}: ${pct(count,sample)} in-spec (${sample-count} ${r.type==='Maker'?'batang':'pack'} bermasalah)`);
+    const sample=Number(r.sample);
+    if(Number.isInteger(sample)&&sample>0)for(const [name,v] of Object.entries(r.visual||{})){
+      if(v==null||v==='')continue;const count=Number(v);
+      if(!Number.isInteger(count)||count<0||count>sample)return {status:'INVALID',issues:[`${name}: jumlah baik harus 0–${sample}.`],inspected:0,good:0};
+      inspected+=sample;good+=count;if(100*count/sample<Number(rulesFor(r).slice().sort((a,b)=>Number(b.min)-Number(a.min))[0]?.min??71))issues.push(`${name}: ${pct(count,sample)} in-spec (${sample-count} ${r.type==='Maker'?'batang':'pack'} bermasalah)`);
     }
     if(!Number.isInteger(sample)||sample<1||sample>10000)return {status:'INVALID',issues:['Jumlah sampel harus bilangan 1–10.000.'],inspected:0,good:0};
     if(!inspected&&!r.noFinding)return {status:'PENDING',issues:['Isi minimal satu parameter yang diperiksa.'],inspected:0,good:0};
     if(!inspected&&r.noFinding){inspected=sample;good=sample}
-    const rate=100*good/inspected;return {status:rate>=71?'GOOD':rate>=50?'FAIR':'BAD',issues,inspected,good};
+    const rate=100*good/inspected,rules=rulesFor(r).slice().sort((a,b)=>Number(b.min)-Number(a.min));
+    return {status:rules.find(rule=>rate>=Number(rule.min))?.label||'INVALID',issues,inspected,good};
   }
   function demoData(){
     const out=[],base=dateOf(today()),brands=['ARM','AMB','ARB','AMT','ARB'];
@@ -64,27 +70,27 @@
     return out;
   }
   const demo=demoData();
-  const allRecords=()=>[$('show-demo').checked?demo:[],manual].flat().map(r=>({...r,result:assess(r)})).filter(r=>['GOOD','FAIR','BAD','MACHINE TROUBLE'].includes(r.result.status)).sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));
+  const allRecords=()=>[$('show-demo').checked?demo:[],manual].flat().map(r=>({...r,result:assess(r)})).filter(r=>!['INVALID','PENDING'].includes(r.result.status)).sort((a,b)=>(b.date+b.time).localeCompare(a.date+a.time));
 
   function periodBounds(){const period=$('period').value,selected=$('period-date').value||today();if(period==='monthly'){const month=$('period-month').value||today().slice(0,7);return {start:`${month}-01`,end:`${month}-${String(new Date(+month.slice(0,4),+month.slice(5),0).getDate()).padStart(2,'0')}`,caption:new Intl.DateTimeFormat('id-ID',{month:'long',year:'numeric'}).format(dateOf(`${month}-01`))}}if(period==='weekly'){const d=dateOf(selected),delta=(d.getDay()+6)%7;d.setDate(d.getDate()-delta);const start=dateKey(d);d.setDate(d.getDate()+4);return {start,end:dateKey(d),caption:`Minggu kerja ${displayDate(start)} – ${displayDate(dateKey(d))} (Senin–Jumat)`}}return {start:selected,end:selected,caption:displayDate(selected)}}
   function filtered(){const {start,end}=periodBounds(),brand=$('filter-brand').value;return allRecords().filter(r=>r.date>=start&&r.date<=end&&(brand==='ALL'||brandOf(r)===brand))}
   function buildVisual(container,names,prefix){$(container).innerHTML=names.map((name,i)=>`<div class="field"><label for="${prefix}-${i}">${safe(name)}</label><input id="${prefix}-${i}" data-name="${safe(name)}" class="${prefix}-count" type="number" step="1" min="0" placeholder="Jumlah yang baik"><span class="mini-result" id="${prefix}-result-${i}">In-Spec — · Out-Spec —</span></div>`).join('')}
-  function draft(type){const prefix=type==='Maker'?'maker':'packer',visual={},physical={};document.querySelectorAll(`.${prefix}-count`).forEach(el=>{if(el.value!=='')visual[el.dataset.name]=Number(el.value)});
+  function draft(type){const prefix=type==='Maker'?'maker':'packer',visual={},physical={};document.querySelectorAll(`.${prefix}-count`).forEach(el=>{if(el.value!=='')visual[el.dataset.name]=Number(el.value)});const editing=manual.find(item=>item.id===$(`${prefix}-form`).dataset.editId);if(editing)for(const [name,value] of Object.entries(editing.visual||{}))if(!visualNames(type).includes(name))visual[name]=value;
     if(type==='Maker')for(const key of Object.keys(PHYSICAL)){const el=$(`maker-${key}`);if(el.value!=='')physical[key]=Number(el.value)}
     const machineTrouble=type==='Maker'&&$('maker-machine-trouble').checked;
     return {type,date:$(`${prefix}-date`).value,time:$(`${prefix}-time`).value,qc:$(`${prefix}-qc`).value.trim(),operator:$(`${prefix}-operator`).value.trim(),shift:$(`${prefix}-shift`).value,brand:$(`${prefix}-brand`).value,machine:$(`${prefix}-machine`).value,sample:machineTrouble?0:Number($(`${prefix}-sample`).value),visual:machineTrouble?{}:visual,physical:machineTrouble?{}:physical,noFinding:false,machineTrouble,notes:$(`${prefix}-notes`).value.trim(),trouble:type==='Maker'?$('maker-trouble').value.trim():''};
   }
-  function updateTargets(){const s=BRAND_SPECS[$('maker-brand').value];for(const [key,meta] of Object.entries(PHYSICAL))$(`target-${key}`).textContent=s?`LSL ${num(s[key][0])} · USL ${num(s[key][1])} ${meta.unit}`:'Pilih brand untuk melihat target'}
+  function updateTargets(){const s=master.brands.find(b=>b.station==='Maker'&&b.code===$('maker-brand').value)?.physicalLimits;for(const [key,meta] of Object.entries(PHYSICAL))$(`target-${key}`).textContent=s?`LSL ${num(s[key][0])} · USL ${num(s[key][1])} ${meta.unit}`:'Pilih brand untuk melihat target'}
   function updateForm(type){
     if(type==='Maker'){const trouble=$('maker-machine-trouble').checked;$('maker-measurements').classList.toggle('hidden',trouble);$('maker-sample').disabled=trouble;document.querySelectorAll('#maker-measurements input').forEach(el=>el.disabled=trouble)}
-    const r=draft(type),a=assess(r),prefix=type==='Maker'?'maker':'packer',names=type==='Maker'?MAKER_VISUAL:PACKER_VISUAL;
+    const r=draft(type),a=assess(r),prefix=type==='Maker'?'maker':'packer',names=visualNames(type);
     const status=$(`${prefix}-status`);status.textContent=a.status==='INVALID'?'PERIKSA INPUT':a.status==='PENDING'?'BELUM DINILAI':a.status==='MACHINE TROUBLE'?'Machine Trouble':a.status;
-    status.className=a.status==='BAD'?'status-bad':a.status==='GOOD'?'status-good':a.status==='FAIR'?'status-fair':'status-pending';
+    status.className=`status-${statusTone(a.status)}`;
     $(`${prefix}-reason`).textContent=a.issues.length?`Parameter bermasalah:\n• ${a.issues.join('\n• ')}`:a.status==='MACHINE TROUBLE'?`Trouble point: ${r.trouble}\nKeterangan: ${r.notes}`:'Parameter terisi sesuai spesifikasi.';
     $(`${prefix}-in`).textContent=`In-Spec ${pct(a.good,a.inspected)}`;$(`${prefix}-out`).textContent=`Out-Spec ${pct(a.inspected-a.good,a.inspected)}`;
     names.forEach((name,i)=>{const v=r.visual[name],el=$(`${prefix}-result-${i}`),rate=v==null||!r.sample?null:100*v/r.sample;
       el.textContent=rate==null?'In-Spec — · Out-Spec —':`In-Spec ${pct(v,r.sample)} · Out-Spec ${pct(r.sample-v,r.sample)}`;
-      el.style.color=rate==null?'#cdbbe0':rate>=71?'#6aefb6':rate>=50?'#ffd56d':'#ff8ca5';$(`${prefix}-${i}`).max=String(r.sample||10000)});
+      const band=rate==null?null:rulesFor(r).slice().sort((a,b)=>Number(b.min)-Number(a.min)).find(x=>rate>=Number(x.min));el.style.color=rate==null?'#cdbbe0':statusTone(band?.label)==='good'?'#6aefb6':statusTone(band?.label)==='fair'?'#ffd56d':'#ff8ca5';$(`${prefix}-${i}`).max=String(r.sample||10000)});
   }
   function toggleStationForm(prefix,open,{scroll=true}={}){
     $(`${prefix}-form-area`).classList.toggle('hidden',!open);
@@ -101,33 +107,32 @@
     document.querySelectorAll('.nav-button').forEach(el=>{if(el.dataset.view===id)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current')});
     const info={dashboard:['Ringkasan Produksi SKM','Dashboard harian, mingguan, dan bulanan untuk Maker dan Packaging dalam satu halaman.'],maker:['Maker Station · Rokok Batangan','Catat pemeriksaan physical dan jumlah batang baik per parameter visual.'],packer:['Packer Station · Packaging','Catat jumlah pack baik, lalu lihat status Good, Fair, atau Bad otomatis.'],history:['Data Inspeksi SKM','Telusuri semua hasil inspeksi dari periode dan bagian SKM.'],settings:['Pengaturan Akun SKM','Kelola akses Admin, QC Inspector, dan Guest seperti dashboard SKT.']};
     $('view-title').textContent=info[id][0];$('view-description').textContent=info[id][1];
-    if(id==='dashboard')renderDashboard();if(id==='maker'||id==='packer'){toggleStationForm(id,false,{scroll:false});renderStation(id)}if(id==='history')renderHistory();if(id==='settings')loadUsers();
+    if(id==='dashboard')renderDashboard();if(id==='maker'||id==='packer'){toggleStationForm(id,false,{scroll:false});renderStation(id)}if(id==='history')renderHistory();if(id==='settings'){loadUsers();renderMasterSettings()};
     window.scrollTo({top:0,behavior:'smooth'});
   }
   function productionWarnings(r){
     if(r.machineTrouble)return [`Machine Trouble${r.trouble?': '+r.trouble.slice(0,75):''}`];
     const points=[];
     if(r.type==='Maker')for(const [key,meta] of Object.entries(PHYSICAL)){
-      const v=r.physical?.[key],bounds=BRAND_SPECS[brandOf(r)]?.[key];
+      const v=r.physical?.[key],bounds=boundsFor(r)?.[key];
       if(v==null||v===''||!Number.isFinite(Number(v))||!bounds)continue;
       if(Number(v)<bounds[0])points.push(`${meta.label} rendah`);
       if(Number(v)>bounds[1])points.push(`${meta.label} tinggi`);
     }
-    const sample=Number(r.sample),names=r.type==='Maker'?MAKER_VISUAL:PACKER_VISUAL;
-    if(Number.isInteger(sample)&&sample>0)for(const name of names){
-      const v=r.visual?.[name];if(v==null||v==='')continue;
-      const count=Number(v);if(Number.isInteger(count)&&count>=0&&count<=sample&&100*count/sample<71)points.push(`${name} bermasalah`);
+    const sample=Number(r.sample);
+    if(Number.isInteger(sample)&&sample>0)for(const [name,v] of Object.entries(r.visual||{})){if(v==null||v==='')continue;
+      const count=Number(v);if(Number.isInteger(count)&&count>=0&&count<=sample&&100*count/sample<Number(rulesFor(r).slice().sort((a,b)=>Number(b.min)-Number(a.min))[0]?.min??71))points.push(`${name} bermasalah`);
     }
     return points;
   }
   function compactWarnings(r,limit=3){const points=productionWarnings(r);return points.length?`<ul class="warning-points">${points.slice(0,limit).map(x=>`<li>${safe(x)}</li>`).join('')}${points.length>limit?`<li class="muted">+${points.length-limit} lainnya</li>`:''}</ul>`:'—'}
   function warningMarkup(r){return compactWarnings(r)}
   function tableMarkup(rows,includeActions){if(!rows.length)return '<div class="empty">Belum ada inspeksi pada filter yang dipilih.</div>';
-    return `<div class="table-wrap"><table><thead><tr><th>Tanggal / Jam</th><th>Bagian</th><th>Brand / Mesin</th><th>QC / Shift</th><th>In / Out</th><th>Hasil</th><th>Warning</th>${includeActions?'<th>Aksi</th>':''}</tr></thead><tbody>${rows.map(r=>`<tr><td>${safe(displayDate(r.date))}<br><span class="muted">${safe(r.time)}</span></td><td>${r.type==='Maker'?'Rokok Batangan':'Packaging'}</td><td><b>${safe(displayBrand(r))}</b><br>${safe(r.machine)}</td><td>${safe(r.qc)}<br><span class="muted">${safe(r.operator||'')} · ${safe(r.shift)}</span></td><td>${pct(r.result.good,r.result.inspected)} / ${pct(r.result.inspected-r.result.good,r.result.inspected)}</td><td><span class="tag ${r.result.status==='GOOD'?'good':r.result.status==='FAIR'?'fair':r.result.status==='BAD'?'bad':'pending'}">${r.result.status==='MACHINE TROUBLE'?'Machine Trouble':r.result.status}</span></td><td>${warningMarkup(r)}</td>${includeActions?`<td>${canDeleteRecord(r)?`<button type="button" class="secondary" data-edit="${safe(r.id)}">Edit</button> <button type="button" class="delete" data-delete="${safe(r.id)}">Hapus</button>`:'—'}</td>`:''}</tr>`).join('')}</tbody></table></div>`}
+    return `<div class="table-wrap"><table><thead><tr><th>Tanggal / Jam</th><th>Bagian</th><th>Brand / Mesin</th><th>QC / Shift</th><th>In / Out</th><th>Hasil</th><th>Warning</th>${includeActions?'<th>Aksi</th>':''}</tr></thead><tbody>${rows.map(r=>`<tr><td>${safe(displayDate(r.date))}<br><span class="muted">${safe(r.time)}</span></td><td>${r.type==='Maker'?'Rokok Batangan':'Packaging'}</td><td><b>${safe(displayBrand(r))}</b><br>${safe(r.machine)}</td><td>${safe(r.qc)}<br><span class="muted">${safe(r.operator||'')} · ${safe(r.shift)}</span></td><td>${pct(r.result.good,r.result.inspected)} / ${pct(r.result.inspected-r.result.good,r.result.inspected)}</td><td><span class="tag ${statusTone(r.result.status)}">${r.result.status==='MACHINE TROUBLE'?'Machine Trouble':r.result.status}</span></td><td>${warningMarkup(r)}</td>${includeActions?`<td>${canDeleteRecord(r)?`<button type="button" class="secondary" data-edit="${safe(r.id)}">Edit</button> <button type="button" class="delete" data-delete="${safe(r.id)}">Hapus</button>`:'—'}</td>`:''}</tr>`).join('')}</tbody></table></div>`}
 
   function chartLine(points,{lo,hi,unit='',percent=false}={}){
     if(!points.length)return '<div class="empty" style="width:100%">Belum ada pengukuran untuk filter ini.</div>';
-    const w=560,h=176,left=43,right=14,top=15,bottom=26,vals=points.map(p=>p.value),vmin=percent?0:Math.min(lo,...vals),vmax=percent?100:Math.max(hi,...vals),span=Math.max(1,(vmax-vmin)*.17),min=percent?0:vmin-span,max=percent?100:vmax+span;
+    const w=560,h=176,left=43,right=14,top=15,bottom=26,vals=points.map(p=>p.value),vmin=percent?0:Math.min(lo,...vals),vmax=percent?100:Math.max(hi,...vals),span=percent?0:Math.max(1e-6,hi-lo,vmax-vmin)*.18,min=percent?0:vmin-span,max=percent?100:vmax+span;
     const x=i=>left+(w-left-right)*(points.length===1?.5:i/(points.length-1)),y=v=>top+(h-top-bottom)*(1-(v-min)/(max-min));
     const grid=Array.from({length:5},(_,i)=>{const v=max-(max-min)*i/4,yy=y(v);return `<line x1="${left}" y1="${yy}" x2="${w-right}" y2="${yy}" stroke="#473451" stroke-width="1"/><text x="${left-6}" y="${yy+3}" text-anchor="end" fill="#baa7cf" font-size="9">${percent?Math.round(v)+'%':num(v)}</text>`}).join('');
     const limits=percent?'':[lo,hi].map(v=>`<line x1="${left}" x2="${w-right}" y1="${y(v)}" y2="${y(v)}" stroke="#ffd075" stroke-dasharray="5 4" stroke-width="1.3"/>`).join('');
@@ -137,12 +142,12 @@
     return `<svg viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" role="img" aria-label="Grafik nilai aktual dan batas spesifikasi"><rect x="${left}" y="${top}" width="${w-left-right}" height="${h-top-bottom}" fill="#21182f"/>${grid}${limits}<path d="${line}" fill="none" stroke="#92a6fa" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>${marks}${ticks}</svg>`;
   }
   function renderPhysical(rows){const brand=$('physical-brand').value,machine=$('physical-machine').value,makers=rows.filter(r=>r.type==='Maker'&&brandOf(r)===brand&&(machine==='ALL'||r.machine===machine)).slice().reverse();
-    $('physical-charts').innerHTML=Object.entries(PHYSICAL).map(([key,meta])=>{const [lo,hi]=BRAND_SPECS[brand][key],measured=makers.filter(r=>r.physical?.[key]!=null&&Number.isFinite(Number(r.physical[key]))),avg=measured.length?measured.reduce((a,r)=>a+Number(r.physical[key]),0)/measured.length:null,points=measured.map(r=>({value:Number(r.physical[key]),label:`${r.date.slice(5)} ${r.time} · ${r.machine}`}));return `<article class="panel chart-panel"><div class="panel-title"><div><h3>${meta.label} · ${safe(brand)}</h3><p>LSL ${num(lo)} · USL ${num(hi)} ${meta.unit}</p></div><div style="text-align:right"><b>${avg==null?'—':num(avg)+' '+meta.unit}</b><div class="tiny muted">Rata-rata · ${measured.length} titik</div></div></div><div class="plot">${chartLine(points,{lo,hi,unit:meta.unit})}</div><div class="legend"><span>Aktual</span><span class="limit">Batas target</span><span class="outside">Out-Spec</span></div></article>`}).join('')}
-  function renderDashboard(){const bounds=periodBounds(),rows=filtered(),good=rows.filter(r=>r.result.status==='GOOD').length,fair=rows.filter(r=>r.result.status==='FAIR').length,bad=rows.filter(r=>r.result.status==='BAD').length,trouble=rows.filter(r=>r.result.status==='MACHINE TROUBLE').length,inspected=rows.reduce((a,r)=>a+r.result.inspected,0),passes=rows.reduce((a,r)=>a+r.result.good,0),maker=rows.filter(r=>r.type==='Maker').length,packer=rows.length-maker;
+    $('physical-charts').innerHTML=Object.entries(PHYSICAL).map(([key,meta])=>{const limits=master.brands.find(b=>b.station==='Maker'&&b.code===brand)?.physicalLimits||boundsFor(makers.find(r=>boundsFor(r)?.[key])||{type:'Maker',brand})||{},[lo,hi]=limits[key]||[0,1],measured=makers.filter(r=>r.physical?.[key]!=null&&Number.isFinite(Number(r.physical[key]))),avg=measured.length?measured.reduce((a,r)=>a+Number(r.physical[key]),0)/measured.length:null,points=measured.map(r=>({value:Number(r.physical[key]),label:`${r.date.slice(5)} ${r.time} · ${r.machine}`}));return `<article class="panel chart-panel"><div class="panel-title"><div><h3>${meta.label} · ${safe(brand)}</h3><p>LSL ${num(lo)} · USL ${num(hi)} ${meta.unit}</p></div><div style="text-align:right"><b>${avg==null?'—':num(avg)+' '+meta.unit}</b><div class="tiny muted">Rata-rata · ${measured.length} titik</div></div></div><div class="plot">${chartLine(points,{lo,hi,unit:meta.unit})}</div><div class="legend"><span>Aktual</span><span class="limit">Batas target</span><span class="outside">Out-Spec</span></div></article>`}).join('')}
+  function renderDashboard(){const bounds=periodBounds(),rows=filtered(),good=rows.filter(isTopStatus).length,fair=rows.filter(r=>r.result.status==='FAIR').length,bad=rows.filter(r=>!isTopStatus(r)&&r.result.status!=='FAIR'&&r.result.status!=='MACHINE TROUBLE').length,trouble=rows.filter(r=>r.result.status==='MACHINE TROUBLE').length,inspected=rows.reduce((a,r)=>a+r.result.inspected,0),passes=rows.reduce((a,r)=>a+r.result.good,0),maker=rows.filter(r=>r.type==='Maker').length,packer=rows.length-maker;
     $('period-caption').innerHTML=`<strong>${safe(bounds.caption)}</strong> · ${maker} inspeksi Rokok Batangan · ${packer} inspeksi Packaging${$('show-demo').checked?' · termasuk data contoh':''}`;
     for(const [type,prefix] of [['Maker','maker'],['Packer','packer']]){const station=rows.filter(r=>r.type===type),samples=station.reduce((sum,r)=>sum+r.result.inspected,0),passed=station.reduce((sum,r)=>sum+r.result.good,0);$(`${prefix}-score`).textContent=pct(passed,samples);$(`${prefix}-out-score`).textContent=`Out: ${pct(samples-passed,samples)}`;$(`${prefix}-summary-count`).textContent=`${num(station.length)} pemeriksaan · overall In-Spec`}
-    $('kpi-total').textContent=num(rows.length);$('kpi-total-sub').textContent=`${maker} Maker + ${packer} Packaging`;$('kpi-good').textContent=num(good);$('kpi-good-sub').textContent=`${pct(good,rows.length)} dari inspeksi`;$('kpi-bad').textContent=num(fair+bad);$('kpi-bad-sub').textContent=`${fair} Fair · ${bad} Bad · ${trouble} Machine Trouble`;$('kpi-rate').textContent=`${pct(passes,inspected)} / ${pct(inspected-passes,inspected)}`;$('kpi-rate-sub').textContent='Persentase parameter yang diisi';
-    $('overall-status').textContent=!rows.length?'Belum ada inspeksi':`${good} Good · ${fair} Fair · ${bad} Bad · ${trouble} Machine Trouble`;
+    $('kpi-total').textContent=num(rows.length);$('kpi-total-sub').textContent=`${maker} Maker + ${packer} Packaging`;$('kpi-good').textContent=num(good);$('kpi-good-sub').textContent=`${pct(good,rows.length)} dari inspeksi`;$('kpi-bad').textContent=num(fair+bad);$('kpi-bad-sub').textContent=[...new Set(rows.filter(r=>!isTopStatus(r)).map(r=>r.result.status))].map(label=>`${rows.filter(r=>r.result.status===label).length} ${label}`).join(' · ')||'Tidak ada warning';$('kpi-rate').textContent=`${pct(passes,inspected)} / ${pct(inspected-passes,inspected)}`;$('kpi-rate-sub').textContent='Persentase parameter yang diisi';
+    $('overall-status').textContent=!rows.length?'Belum ada inspeksi':[...new Map(rows.map(r=>[r.result.status,0]))].map(([label])=>`${rows.filter(r=>r.result.status===label).length} ${label}`).join(' · ');
     $('overall-description').textContent=!rows.length?'Hasil gabungan Rokok Batangan dan Packaging akan tampil setelah inspeksi tersimpan.':`${num(rows.length)} inspeksi · In-Spec keseluruhan ${pct(passes,inspected)}. Periksa warning di bawah untuk tindak lanjut.`;
     $('dashboard').querySelector('.dashboard-overview').classList.toggle('needs-attention',fair+bad+trouble>0);
     renderPhysical(rows);
@@ -164,7 +169,7 @@
   function renderStation(prefix){
     const type=prefix==='maker'?'Maker':'Packer',bounds=stationBounds(prefix),brand=$(`${prefix}-chart-brand`).value,machine=$(`${prefix}-chart-machine`).value;
     const rows=allRecords().filter(r=>r.type===type&&r.date>=bounds.start&&r.date<=bounds.end&&(brand==='ALL'||brandOf(r)===brand)&&(machine==='ALL'||r.machine===machine));
-    const good=rows.filter(r=>r.result.status==='GOOD').length,bad=rows.filter(r=>['FAIR','BAD'].includes(r.result.status)).length,inspected=rows.reduce((n,r)=>n+r.result.inspected,0),passes=rows.reduce((n,r)=>n+r.result.good,0);
+    const good=rows.filter(isTopStatus).length,bad=rows.filter(r=>!isTopStatus(r)&&r.result.status!=='MACHINE TROUBLE').length,inspected=rows.reduce((n,r)=>n+r.result.inspected,0),passes=rows.reduce((n,r)=>n+r.result.good,0);
     $(`${prefix}-chart-caption`).textContent=`${bounds.caption} · ${brand==='ALL'?'Semua brand':brand} · ${machine==='ALL'?'Semua mesin':machine} · ${rows.length} inspeksi${$('show-demo').checked?' · termasuk data contoh':''}`;
     $(`${prefix}-chart-total`).textContent=num(rows.length);$(`${prefix}-chart-good`).textContent=num(good);
     $(`${prefix}-chart-bad`).textContent=num(bad);$(`${prefix}-chart-good-rate`).textContent=`${pct(good,rows.length)} dari inspeksi`;
@@ -174,7 +179,7 @@
       const key=$(`${prefix}-period`).value==='daily'?r.time:r.date;
       if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);
     }
-    const points=[...groups].map(([key,items])=>({label:key.length===10?key.slice(5):key,value:100*items.filter(r=>r.result.status==='GOOD').length/items.length}));
+    const points=[...groups].map(([key,items])=>({label:key.length===10?key.slice(5):key,value:100*items.filter(isTopStatus).length/items.length}));
     $(`${prefix}-chart-trend`).innerHTML=chartLine(points,{percent:true});
     const counts=new Map();for(const r of rows)for(const issue of r.result.issues){
       const label=issue.split(':')[0].split(/ \d/)[0].slice(0,33);counts.set(label,(counts.get(label)||0)+1);
@@ -184,7 +189,7 @@
     if(prefix==='maker'){
       const chartBrand=brand==='ALL'?'':brand;
       $(`${prefix}-chart-physical`).innerHTML=chartBrand?Object.entries(PHYSICAL).map(([key,meta])=>{
-        const [lo,hi]=BRAND_SPECS[chartBrand][key],measured=rows.filter(r=>r.physical?.[key]!=null&&Number.isFinite(Number(r.physical[key]))).slice().reverse();
+        const limits=master.brands.find(b=>b.station==='Maker'&&b.code===chartBrand)?.physicalLimits||boundsFor(rows.find(r=>boundsFor(r)?.[key])||{type:'Maker',brand:chartBrand})||{},[lo,hi]=limits[key]||[0,1],measured=rows.filter(r=>r.physical?.[key]!=null&&Number.isFinite(Number(r.physical[key]))).slice().reverse();
         const avg=measured.length?measured.reduce((sum,r)=>sum+Number(r.physical[key]),0)/measured.length:null;
         const samples=measured.map(r=>({value:Number(r.physical[key]),label:`${r.date.slice(5)} ${r.time} · ${r.machine}`}));
         return `<article class="panel chart-panel"><div class="panel-title"><div><h3>${meta.label} · ${safe(chartBrand)}</h3><p>LSL ${num(lo)} · USL ${num(hi)} ${meta.unit}</p></div><div style="text-align:right"><b>${avg==null?'—':num(avg)+' '+meta.unit}</b><div class="tiny muted">Rata-rata · ${measured.length} titik</div></div></div><div class="plot">${chartLine(samples,{lo,hi,unit:meta.unit})}</div><div class="legend"><span>Aktual</span><span class="limit">Batas target</span><span class="outside">Out-Spec</span></div></article>`;
@@ -196,13 +201,13 @@
   function historyRows(){const from=$('history-from').value,to=$('history-to').value;return allRecords().filter(r=>(!from||r.date>=from)&&(!to||r.date<=to)&&($('history-shift').value==='ALL'||r.shift===$('history-shift').value)&&($('history-machine').value==='ALL'||r.machine===$('history-machine').value)&&($('history-type').value==='ALL'||r.type===$('history-type').value)&&($('history-brand').value==='ALL'||brandOf(r)===$('history-brand').value)&&($('history-status').value==='ALL'||r.result.status===$('history-status').value))}
   function renderHistory(){const rows=historyRows();$('history-count').textContent=`${num(rows.length)} inspeksi sesuai filter · tabel menampilkan 100 terbaru · Excel memuat semua hasil`;$('history-table').innerHTML=tableMarkup(rows.slice(0,100),canWrite())}
   function setHistoryPeriod(){const kind=$('history-period').value,d=dateOf($('history-from').value||today());let start=dateKey(d),end=start;if(kind==='weekly'){d.setDate(d.getDate()-(d.getDay()+6)%7);start=dateKey(d);d.setDate(d.getDate()+6);end=dateKey(d)}if(kind==='monthly'){start=start.slice(0,7)+'-01';end=dateKey(new Date(d.getFullYear(),d.getMonth()+1,0))}$('history-from').value=start;$('history-to').value=end;renderHistory()}
-  function exportExcel(){const rows=historyRows();if(!rows.length){showToast('Tidak ada data pada filter untuk diekspor.');return}const visual=[...new Set([...MAKER_VISUAL,...PACKER_VISUAL])],cols=['Tanggal','Jam','Bagian','Nama QC','Nama Operator','Shift','Brand','Mesin','Jumlah Sampel','Status','In-Spec (%)','Out-Spec (%)','Trouble Point','Keterangan',...Object.values(PHYSICAL).map(x=>`Average ${x.label} (${x.unit})`),...visual.map(n=>`Visual ${n} (baik)`)],cell=v=>`<Cell><Data ss:Type="${typeof v==='number'&&Number.isFinite(v)?'Number':'String'}">${safe(v??'')}</Data></Cell>`;const data=rows.map(r=>[r.date,r.time,r.type==='Maker'?'Rokok Batangan':'Packaging',r.qc,r.operator||'',r.shift,displayBrand(r),r.machine,r.sample,r.result.status,r.result.inspected?+(100*r.result.good/r.result.inspected).toFixed(1):'',r.result.inspected?+(100*(r.result.inspected-r.result.good)/r.result.inspected).toFixed(1):'',r.trouble||'',r.notes||'',...Object.keys(PHYSICAL).map(k=>r.physical?.[k]??''),...visual.map(n=>r.visual?.[n]??'')]);const xml=`<?xml version="1.0" encoding="UTF-8"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Inspeksi SKM"><Table>${[cols,...data].map(row=>`<Row>${row.map(cell).join('')}</Row>`).join('')}</Table></Worksheet></Workbook>`;const url=URL.createObjectURL(new Blob([xml],{type:'application/vnd.ms-excel;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=`inspeksi-skm-${today()}.xls`;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000)}
+  function exportExcel(){const rows=historyRows();if(!rows.length){showToast('Tidak ada data pada filter untuk diekspor.');return}const visual=[...new Set([...MAKER_VISUAL,...PACKER_VISUAL,...master.visuals.map(x=>x.name),...rows.flatMap(r=>Object.keys(r.visual||{}))])],cols=['Tanggal','Jam','Bagian','Nama QC','Nama Operator','Shift','Brand','Mesin','Jumlah Sampel','Status','In-Spec (%)','Out-Spec (%)','Trouble Point','Keterangan',...Object.values(PHYSICAL).map(x=>`Average ${x.label} (${x.unit})`),...visual.map(n=>`Visual ${n} (baik)`)],cell=v=>`<Cell><Data ss:Type="${typeof v==='number'&&Number.isFinite(v)?'Number':'String'}">${safe(v??'')}</Data></Cell>`;const data=rows.map(r=>[r.date,r.time,r.type==='Maker'?'Rokok Batangan':'Packaging',r.qc,r.operator||'',r.shift,displayBrand(r),r.machine,r.sample,r.result.status,r.result.inspected?+(100*r.result.good/r.result.inspected).toFixed(1):'',r.result.inspected?+(100*(r.result.inspected-r.result.good)/r.result.inspected).toFixed(1):'',r.trouble||'',r.notes||'',...Object.keys(PHYSICAL).map(k=>r.physical?.[k]??''),...visual.map(n=>r.visual?.[n]??'')]);const xml=`<?xml version="1.0" encoding="UTF-8"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Inspeksi SKM"><Table>${[cols,...data].map(row=>`<Row>${row.map(cell).join('')}</Row>`).join('')}</Table></Worksheet></Workbook>`;const url=URL.createObjectURL(new Blob([xml],{type:'application/vnd.ms-excel;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=`inspeksi-skm-${today()}.xls`;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000)}
 
   function mapInspection(row){
     return {
       id:row.id,authorId:row.authorId,source:row.source||'Supabase',type:row.type,
       date:row.date,time:String(row.time).slice(0,5),qc:row.qc,
-      shift:row.shift,brand:row.brand,machine:row.machine,sample:Number(row.sample),operator:row.operator||'',machineTrouble:Boolean(row.machineTrouble),
+      shift:row.shift,brand:row.brand,machine:row.machine,sample:Number(row.sample),operator:row.operator||'',machineTrouble:Boolean(row.machineTrouble),qualitySnapshot:row.qualitySnapshot||{},
       physical:row.physical||{},visual:row.visual||{},noFinding:Boolean(row.noFinding),
       trouble:row.trouble||'',notes:row.notes||'',code:row.code||'',
       cigarettes:row.cigarettes??'',packCount:row.packCount??''
@@ -231,7 +236,7 @@
       const data=await window.skmApiRequest('/api/inspections');
       if(sequence!==loadSequence||currentUser?.id!==userId)return;
       manual=(data.inspections||[]).map(mapInspection);
-      renderDashboard();renderStation('maker');renderStation('packer');renderHistory();
+      renderMasterOptions();renderDashboard();renderStation('maker');renderStation('packer');renderHistory();
       $('sync-status').textContent=`${num(manual.length)} inspeksi tersinkron · ${new Intl.DateTimeFormat('id-ID',{hour:'2-digit',minute:'2-digit'}).format(new Date())}`;
     }catch(error){
       if(sequence!==loadSequence||currentUser?.id!==userId)return;
@@ -251,6 +256,7 @@
       .forEach(button=>button.classList.toggle('hidden',!canWrite()));
     $('history-nav').classList.toggle('hidden',user.role==='GUEST_EXTERNAL');
     $('settings-nav').classList.toggle('hidden',user.role!=='ADMIN');
+    try{await loadMaster()}catch(error){showToast(`Gagal memuat master: ${error.message||error}`)}
     document.body.classList.add('authenticated');
     $('auth-screen').classList.add('hidden');
     $('app-root').classList.remove('hidden');
@@ -291,7 +297,7 @@
     finally{submit.disabled=false;submit.textContent=`Simpan Inspeksi ${type==='Maker'?'Rokok Batangan':'Packaging'}`}
   }
 
-  function editRecord(id){const r=manual.find(item=>item.id===id);if(!r||!canDeleteRecord(r))return;const prefix=r.type==='Maker'?'maker':'packer';showView(prefix);toggleStationForm(prefix,true,{scroll:false});for(const key of ['shift','date','time','machine','operator'])$(`${prefix}-${key}`).value=r[key]??'';$(`${prefix}-brand`).value=brandOf(r);$(`${prefix}-sample`).value=r.sample||10;$(`${prefix}-qc`).value=r.qc;$(`${prefix}-notes`).value=r.notes||'';if(r.type==='Maker'){$('maker-machine-trouble').checked=!!r.machineTrouble;$('maker-trouble').value=r.trouble||'';for(const key of Object.keys(PHYSICAL))$(`maker-${key}`).value=r.physical?.[key]??''}document.querySelectorAll(`.${prefix}-count`).forEach(el=>el.value=r.visual?.[el.dataset.name]??'');$(`${prefix}-form`).dataset.editId=r.id;updateTargets();updateForm(r.type);$(`${prefix}-form`).scrollIntoView({behavior:'smooth',block:'start'});showToast('Data dimuat. Simpan untuk memperbarui data bersama.')}
+  function editRecord(id){const r=manual.find(item=>item.id===id);if(!r||!canDeleteRecord(r))return;const prefix=r.type==='Maker'?'maker':'packer';showView(prefix);toggleStationForm(prefix,true,{scroll:false});for(const key of ['shift','date','time','machine','operator'])$(`${prefix}-${key}`).value=r[key]??'';$(`${prefix}-brand`).value=brandOf(r);if(!$(`${prefix}-brand`).value){showToast('Brand lama sudah dihapus. Pilih brand aktif sebelum menyimpan.')} $(`${prefix}-sample`).value=r.sample||10;$(`${prefix}-qc`).value=r.qc;$(`${prefix}-notes`).value=r.notes||'';if(r.type==='Maker'){$('maker-machine-trouble').checked=!!r.machineTrouble;$('maker-trouble').value=r.trouble||'';for(const key of Object.keys(PHYSICAL))$(`maker-${key}`).value=r.physical?.[key]??''}document.querySelectorAll(`.${prefix}-count`).forEach(el=>el.value=r.visual?.[el.dataset.name]??'');$(`${prefix}-form`).dataset.editId=r.id;updateTargets();updateForm(r.type);$(`${prefix}-form`).scrollIntoView({behavior:'smooth',block:'start'});showToast('Data dimuat. Simpan untuk memperbarui data bersama.')}
   async function removeInspection(id){
     const record=manual.find(r=>r.id===id);
     if(!record||!canDeleteRecord(record))return;
@@ -304,15 +310,15 @@
   }
 
   function renderUsers(){
-    if(!managedUsers.length){$('users-list').innerHTML='<div class="empty">Belum ada akun.</div>';return}
-    const labels={ADMIN:'Admin',INSPECTOR:'QC Inspector',GUEST_INTERNAL:'Guest Internal',GUEST_EXTERNAL:'Guest External'};
-    $('users-list').innerHTML=managedUsers.map(user=>`<div class="alert ${user.isActive?'ok':''}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><b>${safe(user.displayName)}</b><br><span class="muted">@${safe(user.username)} · ${safe(labels[user.role]||user.role)}</span></div><button type="button" class="secondary" data-user-toggle="${safe(user.id)}" data-active="${user.isActive}">${user.isActive?'Nonaktifkan':'Aktifkan'}</button></div></div>`).join('');
+    if(!managedUsers.length){$('online-summary').textContent='0 online · 0 offline';$('users-list').innerHTML='<div class="empty">Belum ada akun.</div>';return}
+    const labels={ADMIN:'Admin',INSPECTOR:'QC Inspector',GUEST_INTERNAL:'Guest Internal',GUEST_EXTERNAL:'Guest External'};$('online-summary').textContent=`${onlineCount} online · ${offlineCount} offline · pembaruan otomatis tiap menit`;
+    $('users-list').innerHTML=managedUsers.map(user=>`<div class="alert ${user.isActive?'ok':''}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><b>${safe(user.displayName)}</b><br><span class="muted">@${safe(user.username)} · ${safe(labels[user.role]||user.role)}</span><br><span class="tag ${user.isOnline?'good':'pending'}">${user.isOnline?'Online':'Offline'}</span>${user.lastSeen?` <span class="muted">Aktif terakhir ${safe(new Intl.DateTimeFormat('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(user.lastSeen)))}</span>`:''}</div><button type="button" class="secondary" data-user-toggle="${safe(user.id)}" data-active="${user.isActive}">${user.isActive?'Nonaktifkan':'Aktifkan'}</button></div></div>`).join('');
   }
 
   async function loadUsers(){
     if(currentUser?.role!=='ADMIN')return;
     $('users-list').innerHTML='<div class="empty">Memuat akun…</div>';
-    try{const data=await window.skmApiRequest('/api/users');managedUsers=data.users||[];renderUsers()}
+    try{const data=await window.skmApiRequest('/api/users');managedUsers=data.users||[];onlineCount=Number(data.onlineCount)||0;offlineCount=Number(data.offlineCount)||0;renderUsers()}
     catch(error){$('users-list').innerHTML=`<div class="alert">${safe(error.message||error)}</div>`}
   }
 
@@ -330,7 +336,50 @@
     catch(error){showToast(`Gagal mengubah akun: ${error.message||error}`)}
   }
 
+
+  function setOptions(id,items,empty){
+    const select=$(id),prior=select.value;
+    select.innerHTML=(empty?`<option value="${safe(empty[0])}">${safe(empty[1])}</option>`:'')+items.map(item=>`<option value="${safe(item)}">${safe(item==='ARB12'?'ARB 12':item==='ARB16'?'ARB 16':item)}</option>`).join('');
+    if([...select.options].some(option=>option.value===prior))select.value=prior;
+  }
+  function renderMasterOptions(){
+    const maker=master.brands.filter(b=>b.station==='Maker').map(b=>b.code),packer=master.brands.filter(b=>b.station==='Packer').map(b=>b.code);
+    setOptions('maker-brand',maker,['','Pilih brand']);setOptions('packer-brand',packer,['','Pilih brand']);
+    for(const [id,values] of [['maker-chart-brand',maker],['packer-chart-brand',packer],['filter-brand',[...new Set([...maker,...packer])]],['history-brand',[...new Set([...maker,...packer,...manual.map(brandOf)])]]])setOptions(id,values,['ALL','Semua brand']);
+    setOptions('physical-brand',maker);
+    setOptions('history-status',[...new Set([...master.statuses.map(x=>x.label),...manual.map(r=>r.result.status),'MACHINE TROUBLE'])],['ALL','Semua status']);
+    for(const type of ['Maker','Packer']){
+      const prefix=type==='Maker'?'maker':'packer',existing={};document.querySelectorAll(`.${prefix}-count`).forEach(el=>existing[el.dataset.name]=el.value);
+      buildVisual(`${prefix}-visuals`,visualNames(type),prefix);
+      document.querySelectorAll(`.${prefix}-count`).forEach(el=>el.value=existing[el.dataset.name]??'');
+    }
+    updateTargets();updateForm('Maker');updateForm('Packer');
+  }
+  async function loadMaster(){const data=await window.skmApiRequest('/api/master');master={brands:data.brands||[],visuals:data.visuals||[],statuses:data.statuses||[]};renderMasterOptions();renderMasterSettings()}
+  function masterRow(label,entity,id,editable=true){return `<div class="master-row"><span>${safe(label)}</span><span class="actions">${editable?`<button type="button" class="secondary" data-master-edit="${entity}" data-id="${safe(id)}">Edit</button>`:''}<button type="button" class="secondary" data-master-delete="${entity}" data-id="${safe(id)}">Hapus</button></span></div>`}
+  function renderMasterSettings(){
+    if(currentUser?.role!=='ADMIN')return;
+    $('brand-list').innerHTML=['Maker','Packer'].map(station=>`<h4 class="master-group">${station==='Maker'?'Batangan':'Packaging'}</h4>`+master.brands.filter(b=>b.station===station).map(b=>masterRow(`${b.code}${station==='Maker'?' · '+Object.entries(b.physicalLimits||{}).map(([key,v])=>`${PHYSICAL[key]?.label||key} ${v[0]}–${v[1]}`).join(' · '):''}`,'brand',b.id)).join('')).join('');
+    $('visual-list').innerHTML=['Maker','Packer'].map(station=>`<h4 class="master-group">${station==='Maker'?'Batangan':'Packaging'}</h4>`+master.visuals.filter(v=>v.station===station).map(v=>masterRow(v.name,'visual',v.id,false)).join('')).join('');
+    $('status-list').innerHTML=master.statuses.map(v=>masterRow(`${v.label} · ≥ ${v.min}%`,'status',v.id)).join('');
+  }
+  function renderLimitFields(){const maker=$('brand-station').value==='Maker';$('brand-limits').classList.toggle('hidden',!maker);$('brand-limits').innerHTML=maker?Object.entries(PHYSICAL).map(([key,meta])=>`<div class="field"><label>${meta.label} (${meta.unit}) · LSL / USL</label><div class="form-grid"><input id="brand-${key}-lo" aria-label="${meta.label} LSL" type="number" step="any" required placeholder="LSL"><input id="brand-${key}-hi" aria-label="${meta.label} USL" type="number" step="any" required placeholder="USL"></div></div>`).join(''):''}
+  function resetMasterForm(entity){const form=$(`${entity}-form`);form.reset();delete form.dataset.editId;$(`${entity}-cancel`).classList.add('hidden');if(entity==='brand'){$('brand-station').disabled=false;renderLimitFields()}}
+  async function mutateMaster(body){try{await window.skmApiRequest('/api/master',{method:'POST',body});await loadMaster();await loadRecords();showToast('Master berhasil diperbarui.')}catch(error){showToast(`Gagal mengubah master: ${error.message||error}`);throw error}}
+  async function heartbeat(){try{await window.skmApiRequest('/api/presence/heartbeat',{method:'POST'})}catch(error){if(Number(error.status)===401)showAuth('Sesi berakhir. Silakan login kembali.')}}
+  function setupMaster(){
+    $('brand-station').addEventListener('change',renderLimitFields);renderLimitFields();
+    for(const entity of ['brand','status'])$(`${entity}-cancel`).addEventListener('click',()=>resetMasterForm(entity));
+    $('brand-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget,station=$('brand-station').value,limits={};if(station==='Maker')for(const key of Object.keys(PHYSICAL)){const lo=Number($(`brand-${key}-lo`).value),hi=Number($(`brand-${key}-hi`).value);if(!(lo<hi)){showToast(`${PHYSICAL[key].label}: LSL harus lebih kecil dari USL.`);return}limits[key]=[lo,hi]}
+      try{await mutateMaster({entity:'brand',action:form.dataset.editId?'update':'create',id:form.dataset.editId,station,code:$('brand-code').value.trim().toUpperCase(),physicalLimits:limits});resetMasterForm('brand')}catch{}});
+    $('visual-form').addEventListener('submit',async event=>{event.preventDefault();try{await mutateMaster({entity:'visual',action:'create',station:$('visual-station').value,name:$('visual-name').value.trim()});event.currentTarget.reset()}catch{}});
+    $('status-form').addEventListener('submit',async event=>{event.preventDefault();const form=event.currentTarget;try{await mutateMaster({entity:'status',action:form.dataset.editId?'update':'create',id:form.dataset.editId,label:$('status-label').value.trim().toUpperCase(),min:Number($('status-min').value)});resetMasterForm('status')}catch{}});
+    $('settings').addEventListener('click',async event=>{const edit=event.target.closest('[data-master-edit]'),del=event.target.closest('[data-master-delete]');if(edit){const entity=edit.dataset.masterEdit,item=(entity==='brand'?master.brands:master.statuses).find(x=>x.id===edit.dataset.id);if(!item)return;const form=$(`${entity}-form`);form.dataset.editId=item.id;$(`${entity}-cancel`).classList.remove('hidden');if(entity==='brand'){$('brand-station').value=item.station;$('brand-station').disabled=true;renderLimitFields();$('brand-code').value=item.code;for(const key of Object.keys(PHYSICAL))if(item.station==='Maker'){$(`brand-${key}-lo`).value=item.physicalLimits?.[key]?.[0]??'';$(`brand-${key}-hi`).value=item.physicalLimits?.[key]?.[1]??''}}else{$('status-label').value=item.label;$('status-min').value=item.min}form.scrollIntoView({behavior:'smooth',block:'center'});return}
+      if(del){const entity=del.dataset.masterDelete,list=entity==='brand'?master.brands:entity==='visual'?master.visuals:master.statuses,item=list.find(x=>x.id===del.dataset.id);if(!item||!confirm(`Hapus ${entity} ${item.code||item.name||item.label}? Inspeksi lama tetap tersimpan.`))return;try{await mutateMaster({entity,action:'delete',id:item.id})}catch{}}});
+  }
+
   function setup(){
+    setupMaster();
     $('auth-ati-logo').src=$('ati-logo').src;
     const now=today();$('history-from').value=now.slice(0,7)+'-01';$('history-to').value=dateKey(new Date(+now.slice(0,4),+now.slice(5),0));for(const m of ['M1','M2','M3','M4','M5','P1','P2','P3','P4','P5','P6','Focke'])$('history-machine').add(new Option(m,m));
     $('period-date').value=now;$('period-month').value=now.slice(0,7);
@@ -416,8 +465,8 @@
       const button=event.target.closest('[data-user-toggle]');if(button)toggleUser(button.dataset.userToggle,button.dataset.active==='true');
     });
     $('refresh-data').addEventListener('click',loadRecords);
-    document.addEventListener('visibilitychange',()=>{if(!document.hidden&&currentUser)loadRecords()});
-    setInterval(()=>{if(!document.hidden&&currentUser)loadRecords()},60000);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden&&currentUser){heartbeat();loadRecords();if($('settings').classList.contains('active'))loadUsers()}});
+    setInterval(()=>{if(currentUser)heartbeat();if(!document.hidden&&currentUser){loadRecords();if($('settings').classList.contains('active'))loadUsers()}},60000);
     updateTargets();updateForm('Maker');updateForm('Packer');renderDashboard();renderHistory();
   }
   setup();
