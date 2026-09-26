@@ -11,6 +11,7 @@
     @media(max-width:850px){.col4{grid-template-columns:repeat(2,minmax(0,1fr))}.chart-grid{grid-template-columns:1fr}.quality-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.result-row{grid-template-columns:1fr}.hero{align-items:flex-start}.hero .flag{white-space:normal}}
     @media(max-width:560px){.shell{padding:0 12px}.top-inner{align-items:flex-start}.identity h1{font-size:15px}.top-side{font-size:10px}.tabs{gap:5px}.nav-button{padding:8px;font-size:11px}.hero{padding:17px;flex-direction:column;gap:10px;margin-top:14px}.hero h2{font-size:17px}.panel{padding:15px}.col2,.quality-grid{grid-template-columns:1fr}.col4{gap:8px}.metric{min-height:115px}.metric strong{font-size:25px}.form-grid{gap:10px}.bar-row{grid-template-columns:minmax(95px,1fr) minmax(75px,2fr) 24px;gap:7px}.filter-row .field{min-width:110px}}
     .tag.fair{background:#6b521b;color:#ffe08a}.tag{white-space:nowrap}.status-fair{color:#ffd56d}.status-help{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;max-height:260px;overflow:auto}.warning-points{margin:0;padding-left:18px;display:grid;gap:4px}.warning-points li{line-height:1.35}
+    .alert .warning-points{margin:6px 0 0;padding-left:18px;gap:3px}.alert .warning-points li{line-height:1.35}
   </style>
   <style>
     /* Tampilan SKM mengikuti keluarga visual dashboard SKT terbaru. */
@@ -311,7 +312,7 @@
       <button type="button" id="history-nav" class="nav-button" data-view="history"><span class="nav-symbol" aria-hidden="true">▤</span><span class="nav-label">Data Inspeksi</span></button>
       <button type="button" id="settings-nav" class="nav-button hidden" data-view="settings"><span class="nav-symbol" aria-hidden="true">⚙</span><span class="nav-label">Pengaturan</span></button>
     </div>
-    <div class="side-foot"><strong>Developed @MT2026</strong><br>Version: v2.0 · 26 September 2026</div>
+    <div class="side-foot"><strong>Developed @MT2026</strong><br>Version: v2.0.2 · 26 September 2026</div>
   </nav>
   <main class="shell">
     <div class="hero"><div><h2 id="view-title">Ringkasan Produksi SKM</h2><p id="view-description">Dashboard harian, mingguan, dan bulanan untuk Maker dan Packaging dalam satu halaman.</p></div><span class="flag">Sigaret Kretek Mesin</span></div>
@@ -390,12 +391,12 @@
       </div>
     </section>
   </main>
-  <footer class="foot"><span>PT Aroma Tobacco Internasional · Production Monitoring SKM</span><span><strong>Developed @MT2026</strong> · Version: <strong>v2.0</strong> · 26 September 2026</span></footer>
+  <footer class="foot"><span>PT Aroma Tobacco Internasional · Production Monitoring SKM</span><span><strong>Developed @MT2026</strong> · Version: <strong>v2.0.2</strong> · 26 September 2026</span></footer>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./supabase-config.js?v=1.6.0"></script>
   <script src="./skm-api.js?v=2.0.0"></script>
-  <script src="./skm-app.js?v=2.0.0"></script>
+  <script src="./skm-app.js?v=2.0.2"></script>
 </body>
 </html>
