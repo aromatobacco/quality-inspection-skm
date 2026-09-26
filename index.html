@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="id">
 <head>
-  <link rel="icon" type="image/png" href="./aroma-logo.png?v=3.0.1">
+  <link rel="icon" type="image/png" href="./aroma-logo.png?v=3.0.2">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#140d22">
@@ -332,7 +332,7 @@
       <button type="button" id="history-nav" class="nav-button" data-view="history"><span class="nav-symbol" aria-hidden="true">▤</span><span class="nav-label">Data Inspeksi</span></button>
       <button type="button" id="settings-nav" class="nav-button hidden" data-view="settings"><span class="nav-symbol" aria-hidden="true">⚙</span><span class="nav-label">Pengaturan</span></button>
     </div>
-    <div class="side-foot"><strong>Developed @MT2026</strong><br>Version: v3.0.1 · 26 September 2026</div>
+    <div class="side-foot"><strong>Developed @MT2026</strong><br>Version: v3.0.2 · 26 September 2026</div>
   </nav>
   <main class="shell">
     <div class="hero"><div><h2 id="view-title">Ringkasan Produksi SKM</h2><p id="view-description">Dashboard harian, mingguan, dan bulanan untuk Maker dan Packaging dalam satu halaman.</p></div><span class="flag">Sigaret Kretek Mesin</span></div>
@@ -421,12 +421,12 @@
       <form id="status-form" class="master-dialog hidden" aria-label="Form status"><h3>Status Hasil</h3><div class="form-grid"><div class="field"><label for="status-label">Nama status</label><input id="status-label" required maxlength="30" placeholder="GOOD"></div><div class="field"><label for="status-min">Minimal In-Spec (%)</label><input id="status-min" type="number" required min="0" max="100" step="0.01"></div></div><div class="form-actions"><button class="primary" type="submit">Simpan Status</button><button class="secondary" id="status-cancel" type="button">Batal</button></div></form>
     </section>
   </main>
-  <footer class="foot"><span>PT Aroma Tobacco Internasional · Production Monitoring SKM</span><span><strong>Developed @MT2026</strong> · Version: <strong>v3.0.1</strong> · 26 September 2026</span></footer>
+  <footer class="foot"><span>PT Aroma Tobacco Internasional · Production Monitoring SKM</span><span><strong>Developed @MT2026</strong> · Version: <strong>v3.0.2</strong> · 26 September 2026</span></footer>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./supabase-config.js?v=1.6.0"></script>
   <script src="./skm-api.js?v=2.0.0"></script>
-  <script src="./skm-app.js?v=3.0.0"></script>
+  <script src="./skm-app.js?v=3.0.2"></script>
 </body>
 </html>
