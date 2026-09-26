@@ -1,67 +1,6 @@
--- QUALITY INSPECTION SKM v1.6.0
--- Jalankan seluruh file ini di Supabase > SQL Editor > Run.
--- Login mengikuti dashboard SKT: setup Admin pertama, username/password, dan role.
+-- QUALITY INSPECTION SKM v2.0 - jalankan di Supabase SQL Editor sebelum mengunggah file web.
+-- Tidak menghapus inspeksi atau akun lama. Kompatibel dengan klien v1.6 selama transisi.
 
-create extension if not exists pgcrypto with schema extensions;
-
-create table if not exists public.skm_app_users (
-  id uuid primary key default extensions.gen_random_uuid(),
-  display_name text not null check (length(trim(display_name)) between 2 and 80),
-  username text not null check (username ~ '^[A-Za-z0-9._-]{3,40}$'),
-  password_hash text not null,
-  role text not null,
-  is_active boolean not null default true,
-  failed_login_count integer not null default 0,
-  locked_until timestamptz,
-  created_at timestamptz not null default now()
-);
-
--- Migrasi role dari versi sebelumnya tanpa menghapus akun yang sudah ada.
-alter table public.skm_app_users drop constraint if exists skm_app_users_role_check;
-update public.skm_app_users set role='GUEST_EXTERNAL' where role='GUEST';
-alter table public.skm_app_users add constraint skm_app_users_role_check
-  check (role in ('ADMIN','INSPECTOR','GUEST_INTERNAL','GUEST_EXTERNAL'));
-
-create unique index if not exists skm_users_username_lower_unique
-  on public.skm_app_users (lower(username));
-
-create table if not exists public.skm_app_sessions (
-  token_hash text primary key,
-  user_id uuid not null references public.skm_app_users(id) on delete cascade,
-  expires_at timestamptz not null,
-  created_at timestamptz not null default now()
-);
-create index if not exists skm_sessions_user_idx on public.skm_app_sessions(user_id);
-create index if not exists skm_sessions_expiry_idx on public.skm_app_sessions(expires_at);
-
-create table if not exists public.skm_quality_inspections (
-  id uuid primary key default extensions.gen_random_uuid(),
-  author_id uuid not null references public.skm_app_users(id) on delete restrict,
-  station text not null check (station in ('Maker','Packer')),
-  sample_date date not null,
-  sample_time time without time zone not null,
-  qc_name text not null,
-  shift text not null check (shift in ('Shift 1','Shift 2','Shift 3')),
-  brand text not null check (brand in ('AMB','AMT','ARM','ARB','ARB12','ARB16')),
-  machine text not null,
-  sample_count integer not null check (sample_count between 0 and 10000),
-  physical jsonb not null default '{}'::jsonb,
-  visual jsonb not null default '{}'::jsonb,
-  no_finding boolean not null default false,
-  operator_name text not null default '',
-  machine_trouble boolean not null default false,
-  trouble_point text not null default '',
-  notes text not null default '',
-  production_code text not null default '',
-  cigarettes_per_pack integer,
-  pack_count integer,
-  created_at timestamptz not null default now(),
-  check ((station='Maker' and machine in ('M1','M2','M3','M4','M5')) or
-         (station='Packer' and machine in ('P1','P2','P3','P4','P5','P6','Focke'))),
-  check (extract(minute from sample_time)=0 and extract(second from sample_time)=0),
-  check (jsonb_typeof(physical)='object' and jsonb_typeof(visual)='object'),
-  check (length(trouble_point)<=500 and length(notes)<=500)
-);
 -- Migrasi v2 untuk tabel yang sudah mempunyai data.
 alter table public.skm_quality_inspections add column if not exists operator_name text not null default '';
 alter table public.skm_quality_inspections add column if not exists machine_trouble boolean not null default false;
@@ -72,11 +11,6 @@ alter table public.skm_quality_inspections drop constraint if exists skm_quality
 alter table public.skm_quality_inspections add constraint skm_quality_inspections_sample_count_check
   check ((machine_trouble and station='Maker' and sample_count=0) or
          (not machine_trouble and sample_count between 1 and 10000));
-
-create index if not exists skm_quality_date_idx
-  on public.skm_quality_inspections(sample_date desc, sample_time desc);
-create index if not exists skm_quality_author_idx
-  on public.skm_quality_inspections(author_id);
 
 create or replace function public.skm_api_request(
   p_path text,
@@ -326,13 +260,3 @@ exception when others then
 end;
 $$;
 
-alter table public.skm_app_users enable row level security;
-alter table public.skm_app_sessions enable row level security;
-alter table public.skm_quality_inspections enable row level security;
-
-revoke all on table public.skm_app_users,public.skm_app_sessions,public.skm_quality_inspections from anon,authenticated;
-revoke all on function public.skm_api_request(text,text,jsonb,text) from public;
-grant usage on schema public to anon,authenticated;
-grant execute on function public.skm_api_request(text,text,jsonb,text) to anon,authenticated;
-
-select 'SETUP LOGIN DAN DATABASE SKM SELESAI' as status;
