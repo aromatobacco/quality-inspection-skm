@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="id">
 <head>
+  <link rel="icon" type="image/png" href="./aroma-logo.png?v=3.0.1">
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#140d22">
@@ -12,6 +13,23 @@
     @media(max-width:560px){.shell{padding:0 12px}.top-inner{align-items:flex-start}.identity h1{font-size:15px}.top-side{font-size:10px}.tabs{gap:5px}.nav-button{padding:8px;font-size:11px}.hero{padding:17px;flex-direction:column;gap:10px;margin-top:14px}.hero h2{font-size:17px}.panel{padding:15px}.col2,.quality-grid{grid-template-columns:1fr}.col4{gap:8px}.metric{min-height:115px}.metric strong{font-size:25px}.form-grid{gap:10px}.bar-row{grid-template-columns:minmax(95px,1fr) minmax(75px,2fr) 24px;gap:7px}.filter-row .field{min-width:110px}}
     .tag.fair{background:#6b521b;color:#ffe08a}.tag{white-space:nowrap}.status-fair{color:#ffd56d}.status-help{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;max-height:260px;overflow:auto}.warning-points{margin:0;padding-left:18px;display:grid;gap:4px}.warning-points li{line-height:1.35}
     .alert .warning-points{margin:6px 0 0;padding-left:18px;gap:3px}.alert .warning-points li{line-height:1.35}
+
+    #settings .master-grid {align-items:stretch}
+    #settings .master-card {display:flex;flex-direction:column;min-height:280px;max-height:360px;padding:17px}
+    #settings .master-card .panel-title {align-items:center;margin-bottom:12px}
+    #settings .master-card .panel-title h3 {font-size:14px}
+    #settings .master-card .panel-title .primary {flex:none;padding:8px 11px}
+    #settings .master-search {width:100%;min-height:38px;background:#1a1427;border:1px solid #59456c;color:#fff;border-radius:9px;padding:8px 11px;margin-bottom:10px}
+    #settings .master-list {min-height:90px;overflow-y:auto;flex:1;scrollbar-width:thin;scrollbar-color:#775294 transparent}
+    #settings .master-row {background:#1b1428;border:0;border-radius:10px;padding:9px 11px;margin-bottom:7px;color:#e9dff0;font-size:11px}
+    #settings .master-row strong {font-size:12px}
+    #settings .master-row small {display:block;color:#af9aba;margin-top:2px}
+    #settings .master-row .secondary {font-size:10px;padding:5px 8px}
+    #settings .master-card>small {padding-top:8px}#settings #online-summary {margin:0 0 8px;padding:8px 10px}#settings #users-refresh {align-self:flex-start;margin-top:9px}
+    .master-backdrop {position:fixed;inset:0;background:#0e0a15b8;z-index:40}
+    #settings .master-dialog {position:fixed;z-index:41;top:50%;left:50%;transform:translate(-50%,-50%);width:min(570px,calc(100vw - 26px));max-height:85vh;overflow-y:auto;background:#241a32;border:1px solid #765696;box-shadow:0 18px 80px #090510a8;border-radius:16px;padding:20px}
+    #settings .master-dialog h3 {margin:0 0 17px;font-size:17px}
+    @media(max-width:680px){#settings .master-grid{grid-template-columns:1fr}#settings .master-card{max-height:330px}#settings .master-dialog .form-grid{grid-template-columns:1fr 1fr}}
   </style>
   <style>
     /* Tampilan SKM mengikuti keluarga visual dashboard SKT terbaru. */
@@ -314,7 +332,7 @@
       <button type="button" id="history-nav" class="nav-button" data-view="history"><span class="nav-symbol" aria-hidden="true">▤</span><span class="nav-label">Data Inspeksi</span></button>
       <button type="button" id="settings-nav" class="nav-button hidden" data-view="settings"><span class="nav-symbol" aria-hidden="true">⚙</span><span class="nav-label">Pengaturan</span></button>
     </div>
-    <div class="side-foot"><strong>Developed @MT2026</strong><br>Version: v3.0.0 · 26 September 2026</div>
+    <div class="side-foot"><strong>Developed @MT2026</strong><br>Version: v3.0.1 · 26 September 2026</div>
   </nav>
   <main class="shell">
     <div class="hero"><div><h2 id="view-title">Ringkasan Produksi SKM</h2><p id="view-description">Dashboard harian, mingguan, dan bulanan untuk Maker dan Packaging dalam satu halaman.</p></div><span class="flag">Sigaret Kretek Mesin</span></div>
@@ -380,31 +398,30 @@
       <div class="helper" id="history-count" style="margin-bottom:10px"></div><div id="history-table"></div></div></section>
 
     <section id="settings" class="section" aria-label="Pengaturan akun SKM">
-      <div class="grid col2">
-        <form id="user-form" class="panel">
-          <div class="panel-title"><div><h3>Tambah Akun Pengguna</h3><p>Admin dapat membuat akun Inspector, Guest Internal, Guest External, atau Admin lain.</p></div><span class="tag demo">ADMIN</span></div>
-          <div class="field"><label for="user-name">Nama pengguna</label><input id="user-name" required minlength="2" maxlength="80" placeholder="Nama QC"></div>
-          <div class="field" style="margin-top:10px"><label for="user-username">Username</label><input id="user-username" required minlength="3" maxlength="40" pattern="[A-Za-z0-9._-]+" placeholder="qc.maker1"></div>
-          <div class="field" style="margin-top:10px"><label for="user-password">Password sementara</label><input id="user-password" type="password" required minlength="8" placeholder="Minimal 8 karakter, huruf dan angka"></div>
-          <div class="field" style="margin-top:10px"><label for="user-role">Role</label><select id="user-role"><option value="INSPECTOR">QC Inspector</option><option value="GUEST_INTERNAL">Guest Internal</option><option value="GUEST_EXTERNAL">Guest External</option><option value="ADMIN">Admin</option></select></div>
-          <button id="user-submit" type="submit" class="primary" style="width:100%;margin-top:16px">Buat Akun</button>
-        </form>
-        <div class="panel"><div class="panel-title"><div><h3>Akun Pengguna SKM</h3><p>Nonaktifkan akun untuk menghentikan akses tanpa menghapus riwayat inspeksi.</p></div><button type="button" id="users-refresh" class="secondary">Segarkan</button></div><p id="online-summary" class="summary-strip">Memuat status pengguna…</p><div id="users-list" class="alert-list"><div class="empty">Memuat akun…</div></div></div>
+      <div class="grid col2 master-grid">
+        <section class="panel master-card"><div class="panel-title"><div><h3>Akun Pengguna SKM</h3><p>Status akun dan pengguna yang sedang online.</p></div><button type="button" class="primary" id="user-add">+ Tambah Akun</button></div><input class="master-search" type="search" id="user-search" placeholder="Cari nama / username…" aria-label="Cari pengguna"><p id="online-summary" class="summary-strip">Memuat status pengguna…</p><div id="users-list" class="master-list"><div class="empty">Memuat akun…</div></div><button type="button" id="users-refresh" class="secondary">Segarkan</button></section>
       </div>
-      <div class="section-heading"><div><h3>Master Quality</h3><p>Atur brand, standar physical, parameter visual, dan rentang hasil. Perubahan berlaku untuk inspeksi baru.</p></div></div>
-      <div class="grid col2">
-        <section class="panel"><div class="panel-title"><div><h3>Master Brand per Station</h3><p>Maker ARB, Packaging ARB 12 dan ARB 16 dikelola terpisah.</p></div></div>
-          <form id="brand-form"><div class="form-grid"><div class="field"><label for="brand-station">Station</label><select id="brand-station"><option value="Maker">Batangan (Maker)</option><option value="Packer">Packaging (Packer)</option></select></div><div class="field"><label for="brand-code">Kode brand</label><input id="brand-code" required maxlength="40" placeholder="Contoh: ARB"></div></div>
-          <div id="brand-limits" class="form-grid" style="margin-top:12px"></div><div class="form-actions"><button class="primary" type="submit">Simpan Brand</button><button class="secondary hidden" id="brand-cancel" type="button">Batal Edit</button></div></form><div id="brand-list" class="alert-list"></div>
-        </section>
-        <section class="panel"><div class="panel-title"><div><h3>Master Status Hasil</h3><p>Persentase minimal menentukan status; nilai 0% wajib tersedia.</p></div></div>
-          <form id="status-form"><div class="form-grid"><div class="field"><label for="status-label">Nama status</label><input id="status-label" required maxlength="30" placeholder="GOOD"></div><div class="field"><label for="status-min">Minimal In-Spec (%)</label><input id="status-min" type="number" required min="0" max="100" step="0.01"></div></div><div class="form-actions"><button class="primary" type="submit">Simpan Status</button><button class="secondary hidden" id="status-cancel" type="button">Batal Edit</button></div></form><div id="status-list" class="alert-list"></div>
-        </section>
-        <section class="panel"><div class="panel-title"><div><h3>Master Parameter Visual</h3><p>Parameter aktif muncul pada form station sesuai pilihan.</p></div></div><form id="visual-form"><div class="form-grid"><div class="field"><label for="visual-station">Station</label><select id="visual-station"><option value="Maker">Batangan (Maker)</option><option value="Packer">Packaging (Packer)</option></select></div><div class="field"><label for="visual-name">Nama parameter</label><input id="visual-name" required maxlength="60" placeholder="Nama pemeriksaan"></div></div><div class="form-actions"><button class="primary" type="submit">Tambah Visual</button></div></form><div id="visual-list" class="alert-list"></div></section>
+      <form id="user-form" class="master-dialog hidden" aria-label="Tambah akun pengguna"><h3>Tambah Akun Pengguna</h3>
+        <div class="field"><label for="user-name">Nama pengguna</label><input id="user-name" required minlength="2" maxlength="80" placeholder="Nama QC"></div>
+        <div class="field" style="margin-top:10px"><label for="user-username">Username</label><input id="user-username" required minlength="3" maxlength="40" pattern="[A-Za-z0-9._-]+" placeholder="qc.maker1"></div>
+        <div class="field" style="margin-top:10px"><label for="user-password">Password sementara</label><input id="user-password" type="password" required minlength="8" placeholder="Minimal 8 karakter, huruf dan angka"></div>
+        <div class="field" style="margin-top:10px"><label for="user-role">Role</label><select id="user-role"><option value="INSPECTOR">QC Inspector</option><option value="GUEST_INTERNAL">Guest Internal</option><option value="GUEST_EXTERNAL">Guest External</option><option value="ADMIN">Admin</option></select></div>
+        <div class="form-actions"><button id="user-submit" type="submit" class="primary">Buat Akun</button><button id="user-cancel" type="button" class="secondary">Batal</button></div>
+      </form>
+      <div class="section-heading"><div><h3>Master Quality</h3><p>Kelola daftar dan standar inspeksi.</p></div></div>
+      <div class="grid col2 master-grid">
+        <section class="panel master-card"><div class="panel-title"><div><h3>Master Brand Batangan</h3><p>Brand Maker dan standar physical tiap brand.</p></div><button class="primary" type="button" data-master-open="brand" data-station="Maker">+ Tambah</button></div><input class="master-search" type="search" data-master-search="brand-maker" placeholder="Cari brand Batangan…" aria-label="Cari brand Batangan"><div id="brand-maker-list" class="master-list"></div><small id="brand-maker-count" class="muted"></small></section>
+        <section class="panel master-card"><div class="panel-title"><div><h3>Master Brand Packaging</h3><p>Brand Packer dikelola terpisah.</p></div><button class="primary" type="button" data-master-open="brand" data-station="Packer">+ Tambah</button></div><input class="master-search" type="search" data-master-search="brand-packer" placeholder="Cari brand Packaging…" aria-label="Cari brand Packaging"><div id="brand-packer-list" class="master-list"></div><small id="brand-packer-count" class="muted"></small></section>
+        <section class="panel master-card"><div class="panel-title"><div><h3>Master Parameter Visual</h3><p>Parameter Maker dan Packer sesuai station.</p></div><button class="primary" type="button" data-master-open="visual">+ Tambah</button></div><input class="master-search" type="search" data-master-search="visual" placeholder="Cari parameter visual…" aria-label="Cari parameter visual"><div id="visual-list" class="master-list"></div><small id="visual-count" class="muted"></small></section>
+        <section class="panel master-card"><div class="panel-title"><div><h3>Master Status Hasil</h3><p>Ambang In-Spec; status 0% wajib tersedia.</p></div><button class="primary" type="button" data-master-open="status">+ Tambah</button></div><input class="master-search" type="search" data-master-search="status" placeholder="Cari status…" aria-label="Cari status"><div id="status-list" class="master-list"></div><small id="status-count" class="muted"></small></section>
       </div>
+      <div id="master-backdrop" class="master-backdrop hidden"></div>
+      <form id="brand-form" class="master-dialog hidden" aria-label="Form brand"><h3>Brand Station</h3><div class="form-grid"><div class="field"><label for="brand-station">Station</label><select id="brand-station"><option value="Maker">Batangan (Maker)</option><option value="Packer">Packaging (Packer)</option></select></div><div class="field"><label for="brand-code">Kode brand</label><input id="brand-code" required maxlength="40" placeholder="Contoh: ARB"></div></div><div id="brand-limits" class="form-grid" style="margin-top:12px"></div><div class="form-actions"><button class="primary" type="submit">Simpan Brand</button><button class="secondary" id="brand-cancel" type="button">Batal</button></div></form>
+      <form id="visual-form" class="master-dialog hidden" aria-label="Form parameter visual"><h3>Tambah Parameter Visual</h3><div class="form-grid"><div class="field"><label for="visual-station">Station</label><select id="visual-station"><option value="Maker">Batangan (Maker)</option><option value="Packer">Packaging (Packer)</option></select></div><div class="field"><label for="visual-name">Nama parameter</label><input id="visual-name" required maxlength="60" placeholder="Nama pemeriksaan"></div></div><div class="form-actions"><button class="primary" type="submit">Tambah Visual</button><button class="secondary" id="visual-cancel" type="button">Batal</button></div></form>
+      <form id="status-form" class="master-dialog hidden" aria-label="Form status"><h3>Status Hasil</h3><div class="form-grid"><div class="field"><label for="status-label">Nama status</label><input id="status-label" required maxlength="30" placeholder="GOOD"></div><div class="field"><label for="status-min">Minimal In-Spec (%)</label><input id="status-min" type="number" required min="0" max="100" step="0.01"></div></div><div class="form-actions"><button class="primary" type="submit">Simpan Status</button><button class="secondary" id="status-cancel" type="button">Batal</button></div></form>
     </section>
   </main>
-  <footer class="foot"><span>PT Aroma Tobacco Internasional · Production Monitoring SKM</span><span><strong>Developed @MT2026</strong> · Version: <strong>v3.0.0</strong> · 26 September 2026</span></footer>
+  <footer class="foot"><span>PT Aroma Tobacco Internasional · Production Monitoring SKM</span><span><strong>Developed @MT2026</strong> · Version: <strong>v3.0.1</strong> · 26 September 2026</span></footer>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
