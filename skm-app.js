@@ -83,11 +83,11 @@
   }
   function updateTargets(){const s=master.brands.find(b=>b.station==='Maker'&&b.code===$('maker-brand').value)?.physicalLimits;for(const [key,meta] of Object.entries(PHYSICAL))$(`target-${key}`).textContent=s?`LSL ${num(s[key][0])} · USL ${num(s[key][1])} ${meta.unit}`:'Pilih brand untuk melihat target'}
   function updateForm(type){
-    {const prefix=type==='Maker'?'maker':'packer',event=Boolean($(`${prefix}-machine-event`).value);$(`${prefix}-measurements`).classList.toggle('hidden',event);$(`${prefix}-sample`).disabled=event;document.querySelectorAll(`#${prefix}-measurements input`).forEach(el=>el.disabled=event)}
+    {const prefix=type==='Maker'?'maker':'packer',event=Boolean($(`${prefix}-machine-event`).value);$(`${prefix}-measurements`).classList.toggle('hidden',event);const sample=$(`${prefix}-sample`);sample.disabled=event;sample.required=!event;sample.closest('.field').classList.toggle('hidden',event);document.querySelectorAll(`#${prefix}-measurements input`).forEach(el=>el.disabled=event);$(`${prefix}-trouble`).required=event;$(`${prefix}-notes`).required=event;$(`${prefix}-trouble-hint`).textContent=event?'(wajib)':'(opsional)';$(`${prefix}-notes-hint`).textContent=event?'(wajib)':'(opsional)'}
     const r=draft(type),a=assess(r),prefix=type==='Maker'?'maker':'packer',names=visualNames(type);
-    const status=$(`${prefix}-status`);status.textContent=a.status==='INVALID'?'PERIKSA INPUT':a.status==='PENDING'?'BELUM DINILAI':a.status==='MACHINE TROUBLE'?'Machine Trouble':a.status==='MACHINE REPAIRED'?'Mesin Diperbaiki':a.status;
+    const status=$(`${prefix}-status`);status.textContent=a.status==='INVALID'&&r.machineEvent?(r.machineEvent==='REPAIRED'?'Mesin Diperbaiki':'Machine Trouble'):a.status==='INVALID'?'PERIKSA INPUT':a.status==='PENDING'?'BELUM DINILAI':a.status==='MACHINE TROUBLE'?'Machine Trouble':a.status==='MACHINE REPAIRED'?'Mesin Diperbaiki':a.status;
     status.className=`status-${statusTone(a.status)}`;
-    $(`${prefix}-reason`).textContent=a.issues.length?`Parameter bermasalah:\n• ${a.issues.join('\n• ')}`:isMachineEvent(r)?`Trouble point: ${r.trouble}\nKeterangan: ${r.notes}`:'Parameter terisi sesuai spesifikasi.';
+    $(`${prefix}-reason`).textContent=a.issues.length?`${r.machineEvent?'Lengkapi catatan mesin':'Parameter bermasalah'}:\n• ${a.issues.join('\n• ')}`:isMachineEvent(r)?`Trouble point: ${r.trouble}\nKeterangan: ${r.notes}`:'Parameter terisi sesuai spesifikasi.';
     $(`${prefix}-in`).textContent=`In-Spec ${pct(a.good,a.inspected)}`;$(`${prefix}-out`).textContent=`Out-Spec ${pct(a.inspected-a.good,a.inspected)}`;
     names.forEach((name,i)=>{const v=r.visual[name],el=$(`${prefix}-result-${i}`),rate=v==null||!r.sample?null:100*v/r.sample;
       el.textContent=rate==null?'In-Spec — · Out-Spec —':`In-Spec ${pct(v,r.sample)} · Out-Spec ${pct(r.sample-v,r.sample)}`;
@@ -348,7 +348,7 @@
     setOptions('maker-brand',maker,['','Pilih brand']);setOptions('packer-brand',packer,['','Pilih brand']);
     for(const [id,values] of [['maker-chart-brand',maker],['packer-chart-brand',packer],['filter-brand',[...new Set([...maker,...packer])]],['history-brand',[...new Set([...maker,...packer,...manual.map(brandOf)])]]])setOptions(id,values,['ALL','Semua brand']);
     setOptions('physical-brand',maker);
-    setOptions('history-status',[...new Set([...master.statuses.map(x=>x.label),...manual.map(r=>r.result.status),'MACHINE TROUBLE','MACHINE REPAIRED'])],['ALL','Semua status']);
+    setOptions('history-status',[...new Set([...master.statuses.map(x=>x.label),...manual.map(r=>assess(r).status),'MACHINE TROUBLE','MACHINE REPAIRED'])],['ALL','Semua status']);
     for(const type of ['Maker','Packer']){
       const prefix=type==='Maker'?'maker':'packer',existing={};document.querySelectorAll(`.${prefix}-count`).forEach(el=>existing[el.dataset.name]=el.value);
       buildVisual(`${prefix}-visuals`,visualNames(type),prefix);
@@ -427,6 +427,7 @@
     });
     for(const type of ['Maker','Packer']){
       const prefix=type==='Maker'?'maker':'packer',form=$(`${prefix}-form`);
+      $(`${prefix}-machine-event`).addEventListener('change',()=>{updateForm(type);if($(`${prefix}-machine-event`).value){$(`${prefix}-trouble`).focus({preventScroll:true});$(`${prefix}-trouble`).scrollIntoView({behavior:'smooth',block:'center'})}});
       form.addEventListener('input',()=>{if(type==='Maker')updateTargets();updateForm(type)});
       form.addEventListener('change',()=>{if(type==='Maker')updateTargets();updateForm(type)});
       form.addEventListener('reset',()=>{delete form.dataset.editId;setTimeout(()=>{
