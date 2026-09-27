@@ -17,7 +17,8 @@
   const visualNames=type=>master.visuals.filter(x=>x.station===type).map(x=>x.name);
   const rulesFor=r=>r.qualitySnapshot?.statusRules?.length?r.qualitySnapshot.statusRules:(r.id&&r.source!=='Contoh'?LEGACY_STATUS:master.statuses);
   const boundsFor=r=>{const snapshot=r.qualitySnapshot?.physicalLimits;if(snapshot&&Object.keys(snapshot).length)return snapshot;const code=brandOf(r);return r.id&&r.source!=='Contoh'?(BRAND_SPECS[code]||{}):(master.brands.find(b=>b.station==='Maker'&&b.code===code)?.physicalLimits||BRAND_SPECS[code]||{})};
-  const statusTone=status=>status==='GOOD'?'good':status==='FAIR'?'fair':status==='BAD'?'bad':'pending';
+  const isMachineEvent=r=>Boolean(r.machineEvent||r.machineTrouble);
+  const statusTone=status=>status==='MACHINE REPAIRED'?'good':status==='GOOD'?'good':status==='FAIR'?'fair':status==='BAD'?'bad':'pending';
   const isTopStatus=r=>r.result.status===(rulesFor(r).slice().sort((a,b)=>Number(b.min)-Number(a.min))[0]?.label||'GOOD');
   let manual=[];
   let currentUser=null,managedUsers=[],loadSequence=0,activeSession=0,onlineCount=0,offlineCount=0;
@@ -27,7 +28,7 @@
   const canDeleteRecord=r=>r.source!=='Contoh'&&(currentUser?.role==='ADMIN'||(currentUser?.role==='INSPECTOR'&&r.authorId===currentUser?.id));
 
   function assess(r){
-    if(r.type==='Maker'&&r.machineTrouble){const valid=Boolean(r.trouble?.trim()&&r.notes?.trim());return {status:valid?'MACHINE TROUBLE':'INVALID',issues:valid?[]:['Isi trouble point dan keterangan.'],inspected:0,good:0}}
+    if(isMachineEvent(r)){const valid=Boolean(r.trouble?.trim()&&r.notes?.trim());return {status:valid?(r.machineEvent==='REPAIRED'?'MACHINE REPAIRED':'MACHINE TROUBLE'):'INVALID',issues:valid?[]:['Isi trouble point dan keterangan.'],inspected:0,good:0}}
     const issues=[];let inspected=0,good=0;
     if(r.type==='Maker')for(const [key,meta] of Object.entries(PHYSICAL)){
       const val=r.physical?.[key],bounds=boundsFor(r)?.[key];if(val==null||val===''||!Array.isArray(bounds)||!Number.isFinite(Number(val)))continue;
@@ -77,16 +78,16 @@
   function buildVisual(container,names,prefix){$(container).innerHTML=names.map((name,i)=>`<div class="field"><label for="${prefix}-${i}">${safe(name)}</label><input id="${prefix}-${i}" data-name="${safe(name)}" class="${prefix}-count" type="number" step="1" min="0" placeholder="Jumlah yang baik"><span class="mini-result" id="${prefix}-result-${i}">In-Spec — · Out-Spec —</span></div>`).join('')}
   function draft(type){const prefix=type==='Maker'?'maker':'packer',visual={},physical={};document.querySelectorAll(`.${prefix}-count`).forEach(el=>{if(el.value!=='')visual[el.dataset.name]=Number(el.value)});const editing=manual.find(item=>item.id===$(`${prefix}-form`).dataset.editId);if(editing)for(const [name,value] of Object.entries(editing.visual||{}))if(!visualNames(type).includes(name))visual[name]=value;
     if(type==='Maker')for(const key of Object.keys(PHYSICAL)){const el=$(`maker-${key}`);if(el.value!=='')physical[key]=Number(el.value)}
-    const machineTrouble=type==='Maker'&&$('maker-machine-trouble').checked;
-    return {type,date:$(`${prefix}-date`).value,time:$(`${prefix}-time`).value,qc:$(`${prefix}-qc`).value.trim(),operator:$(`${prefix}-operator`).value.trim(),shift:$(`${prefix}-shift`).value,brand:$(`${prefix}-brand`).value,machine:$(`${prefix}-machine`).value,sample:machineTrouble?0:Number($(`${prefix}-sample`).value),visual:machineTrouble?{}:visual,physical:machineTrouble?{}:physical,noFinding:false,machineTrouble,notes:$(`${prefix}-notes`).value.trim(),trouble:type==='Maker'?$('maker-trouble').value.trim():''};
+    const machineEvent=$(`${prefix}-machine-event`).value,machineTrouble=Boolean(machineEvent);
+    return {type,date:$(`${prefix}-date`).value,time:$(`${prefix}-time`).value,qc:$(`${prefix}-qc`).value.trim(),operator:$(`${prefix}-operator`).value.trim(),shift:$(`${prefix}-shift`).value,brand:$(`${prefix}-brand`).value,machine:$(`${prefix}-machine`).value,sample:machineTrouble?0:Number($(`${prefix}-sample`).value),visual:machineTrouble?{}:visual,physical:machineTrouble?{}:physical,noFinding:false,machineTrouble,notes:$(`${prefix}-notes`).value.trim(),trouble:$(`${prefix}-trouble`).value.trim(),machineEvent};
   }
   function updateTargets(){const s=master.brands.find(b=>b.station==='Maker'&&b.code===$('maker-brand').value)?.physicalLimits;for(const [key,meta] of Object.entries(PHYSICAL))$(`target-${key}`).textContent=s?`LSL ${num(s[key][0])} · USL ${num(s[key][1])} ${meta.unit}`:'Pilih brand untuk melihat target'}
   function updateForm(type){
-    if(type==='Maker'){const trouble=$('maker-machine-trouble').checked;$('maker-measurements').classList.toggle('hidden',trouble);$('maker-sample').disabled=trouble;document.querySelectorAll('#maker-measurements input').forEach(el=>el.disabled=trouble)}
+    {const prefix=type==='Maker'?'maker':'packer',event=Boolean($(`${prefix}-machine-event`).value);$(`${prefix}-measurements`).classList.toggle('hidden',event);$(`${prefix}-sample`).disabled=event;document.querySelectorAll(`#${prefix}-measurements input`).forEach(el=>el.disabled=event)}
     const r=draft(type),a=assess(r),prefix=type==='Maker'?'maker':'packer',names=visualNames(type);
-    const status=$(`${prefix}-status`);status.textContent=a.status==='INVALID'?'PERIKSA INPUT':a.status==='PENDING'?'BELUM DINILAI':a.status==='MACHINE TROUBLE'?'Machine Trouble':a.status;
+    const status=$(`${prefix}-status`);status.textContent=a.status==='INVALID'?'PERIKSA INPUT':a.status==='PENDING'?'BELUM DINILAI':a.status==='MACHINE TROUBLE'?'Machine Trouble':a.status==='MACHINE REPAIRED'?'Mesin Diperbaiki':a.status;
     status.className=`status-${statusTone(a.status)}`;
-    $(`${prefix}-reason`).textContent=a.issues.length?`Parameter bermasalah:\n• ${a.issues.join('\n• ')}`:a.status==='MACHINE TROUBLE'?`Trouble point: ${r.trouble}\nKeterangan: ${r.notes}`:'Parameter terisi sesuai spesifikasi.';
+    $(`${prefix}-reason`).textContent=a.issues.length?`Parameter bermasalah:\n• ${a.issues.join('\n• ')}`:isMachineEvent(r)?`Trouble point: ${r.trouble}\nKeterangan: ${r.notes}`:'Parameter terisi sesuai spesifikasi.';
     $(`${prefix}-in`).textContent=`In-Spec ${pct(a.good,a.inspected)}`;$(`${prefix}-out`).textContent=`Out-Spec ${pct(a.inspected-a.good,a.inspected)}`;
     names.forEach((name,i)=>{const v=r.visual[name],el=$(`${prefix}-result-${i}`),rate=v==null||!r.sample?null:100*v/r.sample;
       el.textContent=rate==null?'In-Spec — · Out-Spec —':`In-Spec ${pct(v,r.sample)} · Out-Spec ${pct(r.sample-v,r.sample)}`;
@@ -111,7 +112,7 @@
     window.scrollTo({top:0,behavior:'smooth'});
   }
   function productionWarnings(r){
-    if(r.machineTrouble)return [`Machine Trouble${r.trouble?': '+r.trouble.slice(0,75):''}`];
+    if(isMachineEvent(r))return [`${r.machineEvent==='REPAIRED'?'Mesin diperbaiki':'Machine Trouble'}${r.trouble?': '+r.trouble.slice(0,75):''}`];
     const points=[];
     if(r.type==='Maker')for(const [key,meta] of Object.entries(PHYSICAL)){
       const v=r.physical?.[key],bounds=boundsFor(r)?.[key];
@@ -128,7 +129,7 @@
   function compactWarnings(r,limit=3){const points=productionWarnings(r);return points.length?`<ul class="warning-points">${points.slice(0,limit).map(x=>`<li>${safe(x)}</li>`).join('')}${points.length>limit?`<li class="muted">+${points.length-limit} lainnya</li>`:''}</ul>`:'—'}
   function warningMarkup(r){return compactWarnings(r)}
   function tableMarkup(rows,includeActions){if(!rows.length)return '<div class="empty">Belum ada inspeksi pada filter yang dipilih.</div>';
-    return `<div class="table-wrap"><table><thead><tr><th>Tanggal / Jam</th><th>Bagian</th><th>Brand / Mesin</th><th>QC / Shift</th><th>In / Out</th><th>Hasil</th><th>Warning</th>${includeActions?'<th>Aksi</th>':''}</tr></thead><tbody>${rows.map(r=>`<tr><td>${safe(displayDate(r.date))}<br><span class="muted">${safe(r.time)}</span></td><td>${r.type==='Maker'?'Rokok Batangan':'Packaging'}</td><td><b>${safe(displayBrand(r))}</b><br>${safe(r.machine)}</td><td>${safe(r.qc)}<br><span class="muted">${safe(r.operator||'')} · ${safe(r.shift)}</span></td><td>${pct(r.result.good,r.result.inspected)} / ${pct(r.result.inspected-r.result.good,r.result.inspected)}</td><td><span class="tag ${statusTone(r.result.status)}">${r.result.status==='MACHINE TROUBLE'?'Machine Trouble':r.result.status}</span></td><td>${warningMarkup(r)}</td>${includeActions?`<td>${canDeleteRecord(r)?`<button type="button" class="secondary" data-edit="${safe(r.id)}">Edit</button> <button type="button" class="delete" data-delete="${safe(r.id)}">Hapus</button>`:'—'}</td>`:''}</tr>`).join('')}</tbody></table></div>`}
+    return `<div class="table-wrap"><table><thead><tr><th>Tanggal / Jam</th><th>Bagian</th><th>Brand / Mesin</th><th>QC / Shift</th><th>In / Out</th><th>Hasil</th><th>Warning</th>${includeActions?'<th>Aksi</th>':''}</tr></thead><tbody>${rows.map(r=>`<tr><td>${safe(displayDate(r.date))}<br><span class="muted">${safe(r.time)}</span></td><td>${r.type==='Maker'?'Rokok Batangan':'Packaging'}</td><td><b>${safe(displayBrand(r))}</b><br>${safe(r.machine)}</td><td>${safe(r.qc)}<br><span class="muted">${safe(r.operator||'')} · ${safe(r.shift)}</span></td><td>${pct(r.result.good,r.result.inspected)} / ${pct(r.result.inspected-r.result.good,r.result.inspected)}</td><td><span class="tag ${statusTone(r.result.status)}">${r.result.status==='MACHINE TROUBLE'?'Machine Trouble':r.result.status==='MACHINE REPAIRED'?'Mesin Diperbaiki':r.result.status}</span></td><td>${warningMarkup(r)}</td>${includeActions?`<td>${canDeleteRecord(r)?`<button type="button" class="secondary" data-edit="${safe(r.id)}">Edit</button> <button type="button" class="delete" data-delete="${safe(r.id)}">Hapus</button>`:'—'}</td>`:''}</tr>`).join('')}</tbody></table></div>`}
 
   function chartLine(points,{lo,hi,unit='',percent=false}={}){
     if(!points.length)return '<div class="empty" style="width:100%">Belum ada pengukuran untuk filter ini.</div>';
@@ -143,16 +144,16 @@
   }
   function renderPhysical(rows){const brand=$('physical-brand').value,machine=$('physical-machine').value,makers=rows.filter(r=>r.type==='Maker'&&brandOf(r)===brand&&(machine==='ALL'||r.machine===machine)).slice().reverse();
     $('physical-charts').innerHTML=Object.entries(PHYSICAL).map(([key,meta])=>{const limits=master.brands.find(b=>b.station==='Maker'&&b.code===brand)?.physicalLimits||boundsFor(makers.find(r=>boundsFor(r)?.[key])||{type:'Maker',brand})||{},[lo,hi]=limits[key]||[0,1],measured=makers.filter(r=>r.physical?.[key]!=null&&Number.isFinite(Number(r.physical[key]))),avg=measured.length?measured.reduce((a,r)=>a+Number(r.physical[key]),0)/measured.length:null,points=measured.map(r=>({value:Number(r.physical[key]),label:`${r.date.slice(5)} ${r.time} · ${r.machine}`}));return `<article class="panel chart-panel"><div class="panel-title"><div><h3>${meta.label} · ${safe(brand)}</h3><p>LSL ${num(lo)} · USL ${num(hi)} ${meta.unit}</p></div><div style="text-align:right"><b>${avg==null?'—':num(avg)+' '+meta.unit}</b><div class="tiny muted">Rata-rata · ${measured.length} titik</div></div></div><div class="plot">${chartLine(points,{lo,hi,unit:meta.unit})}</div><div class="legend"><span>Aktual</span><span class="limit">Batas target</span><span class="outside">Out-Spec</span></div></article>`}).join('')}
-  function renderDashboard(){const bounds=periodBounds(),rows=filtered(),good=rows.filter(isTopStatus).length,fair=rows.filter(r=>r.result.status==='FAIR').length,bad=rows.filter(r=>!isTopStatus(r)&&r.result.status!=='FAIR'&&r.result.status!=='MACHINE TROUBLE').length,trouble=rows.filter(r=>r.result.status==='MACHINE TROUBLE').length,inspected=rows.reduce((a,r)=>a+r.result.inspected,0),passes=rows.reduce((a,r)=>a+r.result.good,0),maker=rows.filter(r=>r.type==='Maker').length,packer=rows.length-maker;
+  function renderDashboard(){const bounds=periodBounds(),rows=filtered(),good=rows.filter(isTopStatus).length,fair=rows.filter(r=>r.result.status==='FAIR').length,bad=rows.filter(r=>!isTopStatus(r)&&r.result.status!=='FAIR'&&!isMachineEvent(r)).length,trouble=rows.filter(r=>r.result.status==='MACHINE TROUBLE').length,inspected=rows.reduce((a,r)=>a+r.result.inspected,0),passes=rows.reduce((a,r)=>a+r.result.good,0),maker=rows.filter(r=>r.type==='Maker').length,packer=rows.length-maker;
     $('period-caption').innerHTML=`<strong>${safe(bounds.caption)}</strong> · ${maker} inspeksi Rokok Batangan · ${packer} inspeksi Packaging${$('show-demo').checked?' · termasuk data contoh':''}`;
     for(const [type,prefix] of [['Maker','maker'],['Packer','packer']]){const station=rows.filter(r=>r.type===type),samples=station.reduce((sum,r)=>sum+r.result.inspected,0),passed=station.reduce((sum,r)=>sum+r.result.good,0);$(`${prefix}-score`).textContent=pct(passed,samples);$(`${prefix}-out-score`).textContent=`Out: ${pct(samples-passed,samples)}`;$(`${prefix}-summary-count`).textContent=`${num(station.length)} pemeriksaan · overall In-Spec`}
-    $('kpi-total').textContent=num(rows.length);$('kpi-total-sub').textContent=`${maker} Maker + ${packer} Packaging`;$('kpi-good').textContent=num(good);$('kpi-good-sub').textContent=`${pct(good,rows.length)} dari inspeksi`;$('kpi-bad').textContent=num(fair+bad);$('kpi-bad-sub').textContent=[...new Set(rows.filter(r=>!isTopStatus(r)).map(r=>r.result.status))].map(label=>`${rows.filter(r=>r.result.status===label).length} ${label}`).join(' · ')||'Tidak ada warning';$('kpi-rate').textContent=`${pct(passes,inspected)} / ${pct(inspected-passes,inspected)}`;$('kpi-rate-sub').textContent='Persentase parameter yang diisi';
+    $('kpi-total').textContent=num(rows.length);$('kpi-total-sub').textContent=`${maker} Maker + ${packer} Packaging`;$('kpi-good').textContent=num(good);$('kpi-good-sub').textContent=`${pct(good,rows.filter(r=>!isMachineEvent(r)).length)} dari pemeriksaan kualitas`;$('kpi-bad').textContent=num(fair+bad);$('kpi-bad-sub').textContent=[...new Set(rows.filter(r=>!isTopStatus(r)&&!isMachineEvent(r)).map(r=>r.result.status))].map(label=>`${rows.filter(r=>r.result.status===label).length} ${label}`).join(' · ')||'Tidak ada warning';$('kpi-rate').textContent=`${pct(passes,inspected)} / ${pct(inspected-passes,inspected)}`;$('kpi-rate-sub').textContent='Persentase parameter yang diisi';
     $('overall-status').textContent=!rows.length?'Belum ada inspeksi':[...new Map(rows.map(r=>[r.result.status,0]))].map(([label])=>`${rows.filter(r=>r.result.status===label).length} ${label}`).join(' · ');
     $('overall-description').textContent=!rows.length?'Hasil gabungan Rokok Batangan dan Packaging akan tampil setelah inspeksi tersimpan.':`${num(rows.length)} inspeksi · In-Spec keseluruhan ${pct(passes,inspected)}. Periksa warning di bawah untuk tindak lanjut.`;
     $('dashboard').querySelector('.dashboard-overview').classList.toggle('needs-attention',fair+bad+trouble>0);
     renderPhysical(rows);
     const warnings=rows.filter(r=>productionWarnings(r).length).slice(0,4);
-    $('production-alerts').innerHTML=warnings.length?warnings.map(r=>`<div class="alert"><b>${safe(displayBrand(r))} · ${safe(r.machine)} · ${safe(displayDate(r.date))} ${safe(r.time)}</b>${compactWarnings(r)}</div>`).join(''):'<div class="alert ok">Tidak ada warning pada periode ini.</div>';
+    $('production-alerts').innerHTML=warnings.length?warnings.map(r=>`<div class="alert ${r.machineEvent==='REPAIRED'?'ok':''}"><b>${safe(displayBrand(r))} · ${safe(r.machine)} · ${safe(displayDate(r.date))} ${safe(r.time)}</b>${compactWarnings(r)}</div>`).join(''):'<div class="alert ok">Tidak ada warning pada periode ini.</div>';
   }
   function stationBounds(prefix){
     const period=$(`${prefix}-period`).value,selected=$(`${prefix}-period-date`).value||today();
@@ -169,17 +170,17 @@
   function renderStation(prefix){
     const type=prefix==='maker'?'Maker':'Packer',bounds=stationBounds(prefix),brand=$(`${prefix}-chart-brand`).value,machine=$(`${prefix}-chart-machine`).value;
     const rows=allRecords().filter(r=>r.type===type&&r.date>=bounds.start&&r.date<=bounds.end&&(brand==='ALL'||brandOf(r)===brand)&&(machine==='ALL'||r.machine===machine));
-    const good=rows.filter(isTopStatus).length,bad=rows.filter(r=>!isTopStatus(r)&&r.result.status!=='MACHINE TROUBLE').length,inspected=rows.reduce((n,r)=>n+r.result.inspected,0),passes=rows.reduce((n,r)=>n+r.result.good,0);
+    const good=rows.filter(isTopStatus).length,bad=rows.filter(r=>!isTopStatus(r)&&!isMachineEvent(r)).length,qualityCount=rows.filter(r=>!isMachineEvent(r)).length,inspected=rows.reduce((n,r)=>n+r.result.inspected,0),passes=rows.reduce((n,r)=>n+r.result.good,0);
     $(`${prefix}-chart-caption`).textContent=`${bounds.caption} · ${brand==='ALL'?'Semua brand':brand} · ${machine==='ALL'?'Semua mesin':machine} · ${rows.length} inspeksi${$('show-demo').checked?' · termasuk data contoh':''}`;
     $(`${prefix}-chart-total`).textContent=num(rows.length);$(`${prefix}-chart-good`).textContent=num(good);
-    $(`${prefix}-chart-bad`).textContent=num(bad);$(`${prefix}-chart-good-rate`).textContent=`${pct(good,rows.length)} dari inspeksi`;
+    $(`${prefix}-chart-bad`).textContent=num(bad);$(`${prefix}-chart-good-rate`).textContent=`${pct(good,qualityCount)} dari pemeriksaan kualitas`;
     $(`${prefix}-chart-rate`).textContent=`${pct(passes,inspected)} / ${pct(inspected-passes,inspected)}`;
     const groups=new Map();
     for(const r of rows.slice().reverse()){
       const key=$(`${prefix}-period`).value==='daily'?r.time:r.date;
       if(!groups.has(key))groups.set(key,[]);groups.get(key).push(r);
     }
-    const points=[...groups].map(([key,items])=>({label:key.length===10?key.slice(5):key,value:100*items.filter(isTopStatus).length/items.length}));
+    const points=[...groups].map(([key,items])=>{const quality=items.filter(r=>!isMachineEvent(r));return {label:key.length===10?key.slice(5):key,value:quality.length?100*quality.filter(isTopStatus).length/quality.length:null}}).filter(p=>p.value!=null);
     $(`${prefix}-chart-trend`).innerHTML=chartLine(points,{percent:true});
     const counts=new Map();for(const r of rows)for(const issue of r.result.issues){
       const label=issue.split(':')[0].split(/ \d/)[0].slice(0,33);counts.set(label,(counts.get(label)||0)+1);
@@ -196,7 +197,7 @@
       }).join(''):'<div class="panel"><p>Pilih satu brand pada filter Maker untuk melihat grafik Berat, Diameter, Pressure Drop, dan Ventilasi beserta batas targetnya.</p></div>';
     }
     const warnings=rows.filter(r=>productionWarnings(r).length).slice(0,3);
-    $(`${prefix}-chart-warning`).innerHTML=warnings.length?warnings.map(r=>`<div class="alert"><b>${safe(displayBrand(r))} · ${safe(r.machine)} · ${safe(displayDate(r.date))} ${safe(r.time)}</b>${compactWarnings(r)}</div>`).join(''):'<div class="alert ok">Tidak ada warning pada periode ini.</div>';
+    $(`${prefix}-chart-warning`).innerHTML=warnings.length?warnings.map(r=>`<div class="alert ${r.machineEvent==='REPAIRED'?'ok':''}"><b>${safe(displayBrand(r))} · ${safe(r.machine)} · ${safe(displayDate(r.date))} ${safe(r.time)}</b>${compactWarnings(r)}</div>`).join(''):'<div class="alert ok">Tidak ada warning pada periode ini.</div>';
   }
   function historyRows(){const from=$('history-from').value,to=$('history-to').value;return allRecords().filter(r=>(!from||r.date>=from)&&(!to||r.date<=to)&&($('history-shift').value==='ALL'||r.shift===$('history-shift').value)&&($('history-machine').value==='ALL'||r.machine===$('history-machine').value)&&($('history-type').value==='ALL'||r.type===$('history-type').value)&&($('history-brand').value==='ALL'||brandOf(r)===$('history-brand').value)&&($('history-status').value==='ALL'||r.result.status===$('history-status').value))}
   function renderHistory(){const rows=historyRows();$('history-count').textContent=`${num(rows.length)} inspeksi sesuai filter · tabel menampilkan 100 terbaru · Excel memuat semua hasil`;$('history-table').innerHTML=tableMarkup(rows.slice(0,100),canWrite())}
@@ -207,14 +208,14 @@
     return {
       id:row.id,authorId:row.authorId,source:row.source||'Supabase',type:row.type,
       date:row.date,time:String(row.time).slice(0,5),qc:row.qc,
-      shift:row.shift,brand:row.brand,machine:row.machine,sample:Number(row.sample),operator:row.operator||'',machineTrouble:Boolean(row.machineTrouble),qualitySnapshot:row.qualitySnapshot||{},
+      shift:row.shift,brand:row.brand,machine:row.machine,sample:Number(row.sample),operator:row.operator||'',machineTrouble:Boolean(row.machineTrouble),machineEvent:row.machineEvent||(row.machineTrouble?'TROUBLE':''),qualitySnapshot:row.qualitySnapshot||{},
       physical:row.physical||{},visual:row.visual||{},noFinding:Boolean(row.noFinding),
       trouble:row.trouble||'',notes:row.notes||'',code:row.code||'',
       cigarettes:row.cigarettes??'',packCount:row.packCount??''
     };
   }
 
-  function toDatabase(r){return {type:r.type,date:r.date,time:r.time,shift:r.shift,brand:r.brand,machine:r.machine,sample:r.sample,physical:r.physical,visual:r.visual,noFinding:r.noFinding,trouble:r.trouble,notes:r.notes,operator:r.operator,machineTrouble:r.machineTrouble}}
+  function toDatabase(r){return {type:r.type,date:r.date,time:r.time,shift:r.shift,brand:r.brand,machine:r.machine,sample:r.sample,physical:r.physical,visual:r.visual,noFinding:r.noFinding,trouble:r.trouble,notes:r.notes,operator:r.operator,machineTrouble:r.machineTrouble,machineEvent:r.machineEvent}}
 
   function showAuth(message='',needsBootstrap=false){
     activeSession++;
@@ -297,7 +298,7 @@
     finally{submit.disabled=false;submit.textContent=`Simpan Inspeksi ${type==='Maker'?'Rokok Batangan':'Packaging'}`}
   }
 
-  function editRecord(id){const r=manual.find(item=>item.id===id);if(!r||!canDeleteRecord(r))return;const prefix=r.type==='Maker'?'maker':'packer';showView(prefix);toggleStationForm(prefix,true,{scroll:false});for(const key of ['shift','date','time','machine','operator'])$(`${prefix}-${key}`).value=r[key]??'';$(`${prefix}-brand`).value=brandOf(r);if(!$(`${prefix}-brand`).value){showToast('Brand lama sudah dihapus. Pilih brand aktif sebelum menyimpan.')} $(`${prefix}-sample`).value=r.sample||10;$(`${prefix}-qc`).value=r.qc;$(`${prefix}-notes`).value=r.notes||'';if(r.type==='Maker'){$('maker-machine-trouble').checked=!!r.machineTrouble;$('maker-trouble').value=r.trouble||'';for(const key of Object.keys(PHYSICAL))$(`maker-${key}`).value=r.physical?.[key]??''}document.querySelectorAll(`.${prefix}-count`).forEach(el=>el.value=r.visual?.[el.dataset.name]??'');$(`${prefix}-form`).dataset.editId=r.id;updateTargets();updateForm(r.type);$(`${prefix}-form`).scrollIntoView({behavior:'smooth',block:'start'});showToast('Data dimuat. Simpan untuk memperbarui data bersama.')}
+  function editRecord(id){const r=manual.find(item=>item.id===id);if(!r||!canDeleteRecord(r))return;const prefix=r.type==='Maker'?'maker':'packer';showView(prefix);toggleStationForm(prefix,true,{scroll:false});for(const key of ['shift','date','time','machine','operator'])$(`${prefix}-${key}`).value=r[key]??'';$(`${prefix}-brand`).value=brandOf(r);if(!$(`${prefix}-brand`).value){showToast('Brand lama sudah dihapus. Pilih brand aktif sebelum menyimpan.')} $(`${prefix}-sample`).value=r.sample||10;$(`${prefix}-qc`).value=r.qc;$(`${prefix}-notes`).value=r.notes||'';if(r.type==='Packer'){$('packer-machine-event').value=r.machineEvent||(r.machineTrouble?'TROUBLE':'');$('packer-trouble').value=r.trouble||''}if(r.type==='Maker'){$('maker-machine-event').value=r.machineEvent||(r.machineTrouble?'TROUBLE':'');$('maker-trouble').value=r.trouble||'';for(const key of Object.keys(PHYSICAL))$(`maker-${key}`).value=r.physical?.[key]??''}document.querySelectorAll(`.${prefix}-count`).forEach(el=>el.value=r.visual?.[el.dataset.name]??'');$(`${prefix}-form`).dataset.editId=r.id;updateTargets();updateForm(r.type);$(`${prefix}-form`).scrollIntoView({behavior:'smooth',block:'start'});showToast('Data dimuat. Simpan untuk memperbarui data bersama.')}
   async function removeInspection(id){
     const record=manual.find(r=>r.id===id);
     if(!record||!canDeleteRecord(record))return;
@@ -347,7 +348,7 @@
     setOptions('maker-brand',maker,['','Pilih brand']);setOptions('packer-brand',packer,['','Pilih brand']);
     for(const [id,values] of [['maker-chart-brand',maker],['packer-chart-brand',packer],['filter-brand',[...new Set([...maker,...packer])]],['history-brand',[...new Set([...maker,...packer,...manual.map(brandOf)])]]])setOptions(id,values,['ALL','Semua brand']);
     setOptions('physical-brand',maker);
-    setOptions('history-status',[...new Set([...master.statuses.map(x=>x.label),...manual.map(r=>r.result.status),'MACHINE TROUBLE'])],['ALL','Semua status']);
+    setOptions('history-status',[...new Set([...master.statuses.map(x=>x.label),...manual.map(r=>r.result.status),'MACHINE TROUBLE','MACHINE REPAIRED'])],['ALL','Semua status']);
     for(const type of ['Maker','Packer']){
       const prefix=type==='Maker'?'maker':'packer',existing={};document.querySelectorAll(`.${prefix}-count`).forEach(el=>existing[el.dataset.name]=el.value);
       buildVisual(`${prefix}-visuals`,visualNames(type),prefix);
