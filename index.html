@@ -296,6 +296,77 @@
     .sync-row #sync-status {margin:0}
     .sync-refresh {border:1px solid #b99ccc;border-radius:9px;background:#f6edfa;color:#513568;padding:5px 9px;font-size:11px;font-weight:750;cursor:pointer}
     @media(max-width:680px){.top-side.account-controls{grid-column:1/-1;justify-content:flex-end}.account-pill{max-width:100%;gap:7px;padding-left:8px}.online-indicator{font-size:10px}#user-label{font-size:11px;overflow:hidden;text-overflow:ellipsis}.account-role{font-size:10px;padding:5px 7px}.account-logout{flex:none}}
+
+    /* Tablet: ruang layar dipakai untuk konten, navigasi tetap mudah dijangkau. */
+    @media (min-width:601px) and (max-width:1023px) {
+      .shell {padding-inline:20px}
+      .top-inner {flex-wrap:wrap;min-height:72px;gap:10px 16px;padding-block:12px}
+      .identity {flex:1 1 350px}.identity h1 {font-size:15px;white-space:normal}
+      .top-side.account-controls {margin-left:auto;flex:0 1 auto}
+      .account-pill {gap:9px;max-width:100%}#user-label {overflow:hidden;text-overflow:ellipsis;max-width:160px}
+      .tabs {height:74px;padding-inline:13px;gap:6px}.tabs .nav-button {max-width:170px;font-size:11px}
+      .grid.col4 {grid-template-columns:repeat(2,minmax(0,1fr))}
+      .grid.col2,.chart-grid {grid-template-columns:repeat(2,minmax(0,1fr))}
+      .form-grid {grid-template-columns:repeat(2,minmax(0,1fr))}
+      .quality-grid {grid-template-columns:repeat(2,minmax(0,1fr))}
+      .result-row {grid-template-columns:1fr}
+      .period-bar,.filter-row {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));align-items:end;gap:11px}
+      .period-bar .field,.filter-row .field {min-width:0;width:100%}
+      .period-bar .switch {grid-column:span 2;margin:0;min-height:40px}
+      .auth-card {width:min(690px,100%)}.auth-brand {min-height:235px}
+      #settings .master-card {min-height:270px;max-height:340px}
+    }
+    @media (min-width:601px) and (max-width:740px) {
+      .top-side.account-controls {margin-left:0;width:100%;justify-content:flex-end}
+      .grid.col2,.chart-grid {grid-template-columns:1fr}
+      .period-bar,.filter-row {grid-template-columns:repeat(2,minmax(0,1fr))}
+      .auth-card {width:min(620px,100%)}
+    }
+    /* Handphone: form, ringkasan, dan filter tersusun tanpa scroll ke samping. */
+    @media (max-width:600px) {
+      html {scroll-padding-top:126px}
+      .shell {padding-inline:12px}
+      .top-inner {grid-template-columns:minmax(0,1fr);gap:8px;padding-block:9px}
+      .identity {width:100%;min-width:0}.identity .eyebrow {max-width:none;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .identity h1 {max-width:none;white-space:normal;font-size:12px;line-height:1.25}
+      .top-side.account-controls {grid-column:1;width:100%;justify-content:flex-start;min-width:0}
+      .account-pill {width:100%;min-width:0;justify-content:space-between;gap:7px;padding:4px 5px 4px 9px;overflow:hidden}
+      #user-label {flex:1;min-width:0;max-width:none;margin:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+      .account-role {flex:none}.account-logout {width:34px;height:34px}
+      .tabs {min-height:68px}.tabs .nav-button {min-width:0;flex:1 1 0;padding-inline:2px}
+      .tabs .nav-label {font-size:9px;line-height:1.1}
+      .grid.col2,.chart-grid,#settings .master-grid {grid-template-columns:1fr}
+      .grid.col4 {grid-template-columns:repeat(2,minmax(0,1fr))}
+      .form-grid {grid-template-columns:repeat(2,minmax(0,1fr))}
+      .quality-grid {grid-template-columns:1fr}
+      .period-bar,.filter-row {grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+      .period-bar .field,.filter-row .field {min-width:0}
+      .station-banner {align-items:stretch}.station-banner .primary {width:100%}
+      .result-row {grid-template-columns:1fr}.result-box {min-width:0}
+      .table-wrap td {grid-template-columns:90px minmax(0,1fr)}
+      #settings .master-card {min-height:225px;max-height:330px}
+      #settings .master-dialog {width:calc(100vw - 24px);max-height:calc(100dvh - 100px);padding:16px}
+      .sync-row {align-items:flex-start}.sync-row #sync-status {min-width:0;overflow-wrap:anywhere}
+      #auth-screen {padding:13px;min-height:100svh;align-items:center}
+      .auth-card {width:100%;max-width:510px;min-height:0}
+      .auth-brand {min-height:200px;padding:20px 22px}.auth-brand-copy h1 {font-size:clamp(27px,8vw,37px)}
+      .auth-form-panel {padding:27px 21px 29px}
+      body::before {background-position:55% center}
+    }
+    @media (max-width:420px) {
+      .period-bar,.filter-row {grid-template-columns:1fr 1fr}
+      .form-grid {grid-template-columns:1fr}
+      #settings .master-dialog .form-grid {grid-template-columns:1fr}
+      .metric strong {font-size:22px}.metric {min-height:110px}
+      .station-card-row strong {font-size:22px}
+      .auth-brand {min-height:175px}.auth-form-panel h2 {font-size:26px}
+      .account-pill {gap:5px}.online-indicator {font-size:9px}.account-role {font-size:9px}
+    }
+    @media (max-width:340px) {
+      .grid.col4 {grid-template-columns:1fr}
+      .tabs .nav-label {font-size:8px}
+      .online-indicator {font-size:0}.online-dot {width:8px;height:8px}
+    }
   </style>
 </head>
 <body>
@@ -350,7 +421,7 @@
       <button type="button" id="history-nav" class="nav-button" data-view="history"><span class="nav-symbol" aria-hidden="true">▤</span><span class="nav-label">Data Inspeksi</span></button>
       <button type="button" id="settings-nav" class="nav-button hidden" data-view="settings"><span class="nav-symbol" aria-hidden="true">⚙</span><span class="nav-label">Pengaturan</span></button>
     </div>
-    <div class="side-foot"><strong>Developed @MT2026</strong><br>Version: v3.2.1 · 26 September 2026</div>
+    <div class="side-foot"><strong>Developed @MT2026</strong><br>Version: v3.3.0 · 26 September 2026</div>
   </nav>
   <main class="shell">
     <div class="hero"><div><h2 id="view-title">Ringkasan Produksi SKM</h2><p id="view-description">Dashboard harian, mingguan, dan bulanan untuk Maker dan Packaging dalam satu halaman.</p></div><span class="flag">Sigaret Kretek Mesin</span></div>
@@ -443,12 +514,12 @@
       <form id="status-form" class="master-dialog hidden" aria-label="Form status"><h3>Status Hasil</h3><div class="form-grid"><div class="field"><label for="status-label">Nama status</label><input id="status-label" required maxlength="30" placeholder="GOOD"></div><div class="field"><label for="status-min">Minimal In-Spec (%)</label><input id="status-min" type="number" required min="0" max="100" step="0.01"></div></div><div class="form-actions"><button class="primary" type="submit">Simpan Status</button><button class="secondary" id="status-cancel" type="button">Batal</button></div></form>
     </section>
   </main>
-  <footer class="foot"><span>PT Aroma Tobacco Internasional · Production Monitoring SKM</span><span><strong>Developed @MT2026</strong> · Version: <strong>v3.2.1</strong> · 26 September 2026</span></footer>
+  <footer class="foot"><span>PT Aroma Tobacco Internasional · Production Monitoring SKM</span><span><strong>Developed @MT2026</strong> · Version: <strong>v3.3.0</strong> · 26 September 2026</span></footer>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./supabase-config.js?v=1.6.0"></script>
   <script src="./skm-api.js?v=2.0.0"></script>
-  <script src="./skm-app.js?v=3.2.1"></script>
+  <script src="./skm-app.js?v=3.3.0"></script>
 </body>
 </html>

@@ -1,12 +1,9 @@
-# SKM Quality Inspection v3.2.0
+# SKM Quality Inspection v3.3.0
 
-Dua pembaruan tampilan yang terpisah:
-
-1. Foto mesin yang diberikan menjadi latar halaman login (panel kiri) dan latar seluruh halaman aplikasi, dengan opacity rendah agar teks dan grafik tetap terbaca.
-2. Bagian akun di header kini berupa pill ringkas: indikator Online, nama pengguna, role, dan ikon keluar. Tombol Segarkan dipindah ke baris status sinkronisasi.
+Tampilan tablet dan handphone: login menyesuaikan lebar layar, navigasi tetap mudah dijangkau di bawah, header akun ringkas, ringkasan dan grafik memakai jumlah kolom yang sesuai, form inspeksi dan daftar parameter tidak melebar, tabel riwayat menjadi kartu pada handphone, dan pengaturan tetap dapat dicari serta diedit.
 
 ## Pemasangan
 
-Upload **`index.html`**, **`skm-app.js`**, dan **`machine-background.png`** ke root repository GitHub Pages yang sama dalam satu commit. File `aroma-logo.png` dan `skm-api.js` disertakan sebagai aset pendukung jika belum ada. Pertahankan `supabase-config.js` yang sudah dipakai.
+Upload **`index.html`** dari paket ini ke root repository GitHub Pages. `skm-app.js` dan `machine-background.png` juga disertakan bila belum sama dengan v3.2.1; bila keduanya sudah terpasang, tidak perlu mengubahnya. Tunggu deployment selesai lalu muat ulang. Footer akan menampilkan v3.3.0.
 
-Perubahan ini **tidak membutuhkan migrasi Supabase baru** bila `migration-v3.1.sql` sudah berhasil dijalankan. SQL yang sama disertakan hanya untuk pemasangan baru. Setelah deployment, muat ulang situs dan pastikan footer v3.2.0.
+Perubahan ini hanya CSS dan nomor cache; **Supabase tidak perlu diubah**. Pertahankan `supabase-config.js`.
