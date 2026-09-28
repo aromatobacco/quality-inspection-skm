@@ -251,7 +251,7 @@
     if(!user){showAuth();return}
     currentUser=user;
     const roleLabel={ADMIN:'Admin',INSPECTOR:'QC Inspector',GUEST_INTERNAL:'Guest Internal',GUEST_EXTERNAL:'Guest External'}[user.role]||user.role;
-    $('user-label').textContent=`${user.displayName} · ${roleLabel}`;
+    $('user-label').textContent=user.displayName;$('account-role-label').textContent=roleLabel;
     for(const id of ['maker-qc','packer-qc']){$(id).value=user.displayName;$(id).readOnly=true}
     document.querySelectorAll('.tabs .nav-button[data-view="maker"],.tabs .nav-button[data-view="packer"]')
       .forEach(button=>button.classList.toggle('hidden',!canWrite()));
