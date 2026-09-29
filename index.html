@@ -367,6 +367,10 @@
       .tabs .nav-label {font-size:8px}
       .online-indicator {font-size:0}.online-dot {width:8px;height:8px}
     }
+
+    #settings #users-list .user-actions {display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+    #settings #users-list .user-actions .secondary {min-height:34px;padding:6px 9px}
+    @media(max-width:600px){#settings #users-list .alert>div{align-items:flex-start!important;flex-wrap:wrap}#settings #users-list .user-actions{width:100%;justify-content:flex-start}}
   </style>
 </head>
 <body>
@@ -421,7 +425,7 @@
       <button type="button" id="history-nav" class="nav-button" data-view="history"><span class="nav-symbol" aria-hidden="true">▤</span><span class="nav-label">Data Inspeksi</span></button>
       <button type="button" id="settings-nav" class="nav-button hidden" data-view="settings"><span class="nav-symbol" aria-hidden="true">⚙</span><span class="nav-label">Pengaturan</span></button>
     </div>
-    <div class="side-foot"><strong>Developed @MT2026</strong><br>Version: v3.3.0 · 26 September 2026</div>
+    <div class="side-foot"><strong>Developed @MT2026</strong><br>Version: v3.4.0 · 26 September 2026</div>
   </nav>
   <main class="shell">
     <div class="hero"><div><h2 id="view-title">Ringkasan Produksi SKM</h2><p id="view-description">Dashboard harian, mingguan, dan bulanan untuk Maker dan Packaging dalam satu halaman.</p></div><span class="flag">Sigaret Kretek Mesin</span></div>
@@ -494,10 +498,10 @@
       <div class="grid col2 master-grid">
         <section class="panel master-card"><div class="panel-title"><div><h3>Akun Pengguna SKM</h3><p>Status akun dan pengguna yang sedang online.</p></div><button type="button" class="primary" id="user-add">+ Tambah Akun</button></div><input class="master-search" type="search" id="user-search" placeholder="Cari nama / username…" aria-label="Cari pengguna"><p id="online-summary" class="summary-strip">Memuat status pengguna…</p><div id="users-list" class="master-list"><div class="empty">Memuat akun…</div></div><button type="button" id="users-refresh" class="secondary">Segarkan</button></section>
       </div>
-      <form id="user-form" class="master-dialog hidden" aria-label="Tambah akun pengguna"><h3>Tambah Akun Pengguna</h3>
+      <form id="user-form" class="master-dialog hidden" aria-label="Kelola akun pengguna"><h3 id="user-form-title">Tambah Akun Pengguna</h3>
         <div class="field"><label for="user-name">Nama pengguna</label><input id="user-name" required minlength="2" maxlength="80" placeholder="Nama QC"></div>
         <div class="field" style="margin-top:10px"><label for="user-username">Username</label><input id="user-username" required minlength="3" maxlength="40" pattern="[A-Za-z0-9._-]+" placeholder="qc.maker1"></div>
-        <div class="field" style="margin-top:10px"><label for="user-password">Password sementara</label><input id="user-password" type="password" required minlength="8" placeholder="Minimal 8 karakter, huruf dan angka"></div>
+        <div class="field" style="margin-top:10px"><label for="user-password" id="user-password-label">Password sementara</label><input id="user-password" type="password" required minlength="8" placeholder="Minimal 8 karakter, huruf dan angka"><span class="helper" id="user-password-help">Wajib untuk akun baru.</span></div>
         <div class="field" style="margin-top:10px"><label for="user-role">Role</label><select id="user-role"><option value="INSPECTOR">QC Inspector</option><option value="GUEST_INTERNAL">Guest Internal</option><option value="GUEST_EXTERNAL">Guest External</option><option value="ADMIN">Admin</option></select></div>
         <div class="form-actions"><button id="user-submit" type="submit" class="primary">Buat Akun</button><button id="user-cancel" type="button" class="secondary">Batal</button></div>
       </form>
@@ -514,12 +518,12 @@
       <form id="status-form" class="master-dialog hidden" aria-label="Form status"><h3>Status Hasil</h3><div class="form-grid"><div class="field"><label for="status-label">Nama status</label><input id="status-label" required maxlength="30" placeholder="GOOD"></div><div class="field"><label for="status-min">Minimal In-Spec (%)</label><input id="status-min" type="number" required min="0" max="100" step="0.01"></div></div><div class="form-actions"><button class="primary" type="submit">Simpan Status</button><button class="secondary" id="status-cancel" type="button">Batal</button></div></form>
     </section>
   </main>
-  <footer class="foot"><span>PT Aroma Tobacco Internasional · Production Monitoring SKM</span><span><strong>Developed @MT2026</strong> · Version: <strong>v3.3.0</strong> · 26 September 2026</span></footer>
+  <footer class="foot"><span>PT Aroma Tobacco Internasional · Production Monitoring SKM</span><span><strong>Developed @MT2026</strong> · Version: <strong>v3.4.0</strong> · 26 September 2026</span></footer>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="./supabase-config.js?v=1.6.0"></script>
   <script src="./skm-api.js?v=2.0.0"></script>
-  <script src="./skm-app.js?v=3.3.0"></script>
+  <script src="./skm-app.js?v=3.4.0"></script>
 </body>
 </html>
