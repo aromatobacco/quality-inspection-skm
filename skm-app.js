@@ -313,23 +313,40 @@
   function renderUsers(){
     if(!managedUsers.length){$('online-summary').textContent='0 online · 0 offline';$('users-list').innerHTML='<div class="empty">Belum ada akun.</div>';return}
     const labels={ADMIN:'Admin',INSPECTOR:'QC Inspector',GUEST_INTERNAL:'Guest Internal',GUEST_EXTERNAL:'Guest External'};$('online-summary').textContent=`${onlineCount} online · ${offlineCount} offline · pembaruan otomatis tiap menit`;
-    $('users-list').innerHTML=managedUsers.map(user=>`<div class="alert ${user.isActive?'ok':''}" data-user-item="${safe((user.displayName+' '+user.username).toLowerCase())}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><b>${safe(user.displayName)}</b><br><span class="muted">@${safe(user.username)} · ${safe(labels[user.role]||user.role)}</span><br><span class="tag ${user.isOnline?'good':'pending'}">${user.isOnline?'Online':'Offline'}</span>${user.lastSeen?` <span class="muted">Aktif terakhir ${safe(new Intl.DateTimeFormat('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(user.lastSeen)))}</span>`:''}</div><button type="button" class="secondary" data-user-toggle="${safe(user.id)}" data-active="${user.isActive}">${user.isActive?'Nonaktifkan':'Aktifkan'}</button></div></div>`).join('');const query=$('user-search').value.trim().toLowerCase();$('users-list').querySelectorAll('[data-user-item]').forEach(row=>row.classList.toggle('hidden',!row.dataset.userItem.includes(query)));
+    $('users-list').innerHTML=managedUsers.map(user=>`<div class="alert ${user.isActive?'ok':''}" data-user-item="${safe((user.displayName+' '+user.username).toLowerCase())}"><div style="display:flex;justify-content:space-between;align-items:center;gap:12px"><div><b>${safe(user.displayName)}</b><br><span class="muted">@${safe(user.username)} · ${safe(labels[user.role]||user.role)}</span><br><span class="tag ${user.isOnline?'good':'pending'}">${user.isOnline?'Online':'Offline'}</span>${user.lastSeen?` <span class="muted">Aktif terakhir ${safe(new Intl.DateTimeFormat('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}).format(new Date(user.lastSeen)))}</span>`:''}</div><span class="user-actions"><button type="button" class="secondary" data-user-edit="${safe(user.id)}">Edit</button><button type="button" class="secondary" data-user-toggle="${safe(user.id)}" data-active="${user.isActive}">${user.isActive?'Nonaktifkan':'Aktifkan'}</button></span></div></div>`).join('');const query=$('user-search').value.trim().toLowerCase();$('users-list').querySelectorAll('[data-user-item]').forEach(row=>row.classList.toggle('hidden',!row.dataset.userItem.includes(query)));
   }
 
   async function loadUsers(){
     if(currentUser?.role!=='ADMIN')return;
     $('users-list').innerHTML='<div class="empty">Memuat akun…</div>';
-    try{const data=await window.skmApiRequest('/api/users');managedUsers=data.users||[];onlineCount=Number(data.onlineCount)||0;offlineCount=Number(data.offlineCount)||0;renderUsers()}
+    try{const data=await window.skmApiRequest('/api/users');managedUsers=data.users||[];onlineCount=managedUsers.filter(u=>u.isActive&&u.isOnline).length;offlineCount=managedUsers.length-onlineCount;renderUsers()}
     catch(error){$('users-list').innerHTML=`<div class="alert">${safe(error.message||error)}</div>`}
   }
 
-  async function createUser(){
-    const button=$('user-submit');button.disabled=true;button.textContent='Membuat…';
+  function openUserEditor(id){
+    const form=$('user-form');form.reset();delete form.dataset.editId;
+    const user=managedUsers.find(item=>item.id===id);
+    if(id&&!user){showToast('Akun tidak ditemukan. Segarkan daftar.');return}
+    if(user){form.dataset.editId=user.id;$('user-name').value=user.displayName;$('user-username').value=user.username;$('user-role').value=user.role}
+    $('user-form-title').textContent=user?'Edit Akun Pengguna':'Tambah Akun Pengguna';
+    $('user-password').required=!user;
+    $('user-password-label').textContent=user?'Password baru (opsional)':'Password sementara';
+    $('user-password-help').textContent=user?'Kosongkan jika password tidak berubah.':'Wajib untuk akun baru.';
+    $('user-password').placeholder=user?'Kosongkan jika tidak diganti':'Minimal 8 karakter, huruf dan angka';
+    $('user-submit').textContent=user?'Simpan Perubahan':'Buat Akun';
+    openMasterForm('user');
+  }
+  async function saveUser(){
+    const form=$('user-form'),id=form.dataset.editId,button=$('user-submit');
+    button.disabled=true;button.textContent='Menyimpan…';
     try{
-      await window.skmApiRequest('/api/users',{method:'POST',body:{displayName:$('user-name').value.trim(),username:$('user-username').value.trim(),password:$('user-password').value,role:$('user-role').value}});
-      $('user-form').reset();closeMasterForm();showToast('Akun pengguna berhasil dibuat.');await loadUsers();
-    }catch(error){showToast(`Gagal membuat akun: ${error.message||error}`)}
-    finally{button.disabled=false;button.textContent='Buat Akun'}
+      const body={displayName:$('user-name').value.trim(),username:$('user-username').value.trim(),role:$('user-role').value};
+      if(!id||$('user-password').value)body.password=$('user-password').value;
+      await window.skmApiRequest(id?`/api/users/${id}`:'/api/users',{method:id?'PATCH':'POST',body});
+      if(id===currentUser?.id){currentUser.displayName=body.displayName;currentUser.username=body.username;$('user-label').textContent=body.displayName;for(const name of ['maker-qc','packer-qc'])$(name).value=body.displayName}
+      form.reset();delete form.dataset.editId;closeMasterForm();showToast(id?'Akun berhasil diperbarui.':'Akun pengguna berhasil dibuat.');await loadUsers();
+    }catch(error){showToast(`Gagal menyimpan akun: ${error.message||error}`)}
+    finally{button.disabled=false;button.textContent=form.dataset.editId?'Simpan Perubahan':'Buat Akun'}
   }
 
   async function toggleUser(id,isActive){
@@ -466,10 +483,10 @@
       try{await window.skmApiRequest('/api/auth/logout',{method:'POST'});showAuth('Kamu sudah keluar. Silakan login kembali.')}
       catch(error){showToast(`Gagal keluar: ${error.message||error}`)}
     });
-    $('user-form').addEventListener('submit',event=>{event.preventDefault();createUser()});
-    $('users-refresh').addEventListener('click',loadUsers);$('user-add').addEventListener('click',()=>openMasterForm('user'));$('user-cancel').addEventListener('click',closeMasterForm);$('user-search').addEventListener('input',()=>{const query=$('user-search').value.trim().toLowerCase();$('users-list').querySelectorAll('[data-user-item]').forEach(row=>row.classList.toggle('hidden',!row.dataset.userItem.includes(query))) });
+    $('user-form').addEventListener('submit',event=>{event.preventDefault();saveUser()});
+    $('users-refresh').addEventListener('click',loadUsers);$('user-add').addEventListener('click',()=>openUserEditor());$('user-cancel').addEventListener('click',()=>{$('user-form').reset();delete $('user-form').dataset.editId;closeMasterForm()});$('user-search').addEventListener('input',()=>{const query=$('user-search').value.trim().toLowerCase();$('users-list').querySelectorAll('[data-user-item]').forEach(row=>row.classList.toggle('hidden',!row.dataset.userItem.includes(query))) });
     $('users-list').addEventListener('click',event=>{
-      const button=event.target.closest('[data-user-toggle]');if(button)toggleUser(button.dataset.userToggle,button.dataset.active==='true');
+      const edit=event.target.closest('[data-user-edit]');if(edit){openUserEditor(edit.dataset.userEdit);return}const button=event.target.closest('[data-user-toggle]');if(button)toggleUser(button.dataset.userToggle,button.dataset.active==='true');
     });
     $('refresh-data').addEventListener('click',loadRecords);
     document.addEventListener('visibilitychange',()=>{if(!document.hidden&&currentUser){heartbeat();loadRecords();if($('settings').classList.contains('active'))loadUsers()}});
