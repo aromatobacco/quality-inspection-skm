@@ -111,7 +111,7 @@
     if(id==='settings'&&currentUser?.role!=='ADMIN')return;closeMasterForm();
     document.querySelectorAll('.section').forEach(el=>el.classList.toggle('active',el.id===id));
     document.querySelectorAll('.nav-button').forEach(el=>{if(el.dataset.view===id)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current')});
-    const info={dashboard:['Ringkasan Produksi SKM','Dashboard harian, mingguan, dan bulanan untuk Maker dan Packaging dalam satu halaman.'],maker:['Maker Station · Rokok Batangan','Catat pemeriksaan physical dan jumlah batang baik per parameter visual.'],packer:['Packer Station · Packaging','Catat jumlah pack baik, lalu lihat status Good, Fair, atau Bad otomatis.'],history:['Data Inspeksi SKM','Telusuri semua hasil inspeksi dari periode dan bagian SKM.'],'production-warning':['Warning Produksi Packaging','Temuan Packaging dikelompokkan berdasarkan tanggal sampling, shift, mesin, brand, dan trouble.'],settings:['Pengaturan Akun SKM','Kelola akses Admin, QC Inspector, dan Guest seperti dashboard SKT.']};
+    const info={dashboard:['Ringkasan Produksi SKM','Dashboard harian, mingguan, dan bulanan untuk Maker dan Packaging dalam satu halaman.'],maker:['Maker Station · Rokok Batangan','Catat pemeriksaan physical dan jumlah batang baik per parameter visual.'],packer:['Packer Station · Packaging','Catat jumlah pack baik, lalu lihat status Good, Fair, atau Bad otomatis.'],history:['Data Inspeksi SKM','Telusuri semua hasil inspeksi dari periode dan bagian SKM.'],'production-warning':['Warning Produksi','Temuan Batangan dan Packaging dikelompokkan berdasarkan bagian, tanggal sampling, shift, mesin, brand, dan trouble.'],settings:['Pengaturan Akun SKM','Kelola akses Admin, QC Inspector, dan Guest seperti dashboard SKT.']};
     $('view-title').textContent=info[id][0];$('view-description').textContent=info[id][1];
     if(id==='dashboard')renderDashboard();if(id==='maker'||id==='packer'){toggleStationForm(id,false,{scroll:false});renderStation(id)}if(id==='history')renderHistory();if(id==='production-warning')renderProductionWarnings();if(id==='settings'){loadUsers();renderMasterSettings()};
     window.scrollTo({top:0,behavior:'smooth'});
@@ -208,10 +208,10 @@
   function groupProductionWarnings(rows){
     const grouped=new Map();
     for(const r of rows){
-      if(r.type!=='Packer'||r.source==='Contoh')continue;
+      if(!['Maker','Packer'].includes(r.type)||r.source==='Contoh')continue;
       for(const warning of new Set(productionWarnings(r))){
-        const key=JSON.stringify([r.date,r.shift,r.machine,r.brand,warning]);
-        if(!grouped.has(key))grouped.set(key,{date:r.date,shift:r.shift,machine:r.machine,brand:r.brand,warning,records:[]});
+        const key=JSON.stringify([r.type,r.date,r.shift,r.machine,r.brand,warning]);
+        if(!grouped.has(key))grouped.set(key,{type:r.type,date:r.date,shift:r.shift,machine:r.machine,brand:r.brand,warning,records:[]});
         const group=grouped.get(key);
         if(!group.records.some(x=>x.id===r.id))group.records.push(r);
       }
@@ -220,7 +220,8 @@
       .sort((a,b)=>b.records.length-a.records.length||a.shift.localeCompare(b.shift)||a.machine.localeCompare(b.machine)||a.warning.localeCompare(b.warning));
   }
   function renderProductionWarnings(){
-    const packers=manual.filter(r=>r.type==='Packer'&&r.source!=='Contoh');
+    const type=$('warning-type').value;
+    const packers=manual.filter(r=>['Maker','Packer'].includes(r.type)&&r.source!=='Contoh'&&(type==='ALL'||r.type===type));
     for(const [id,key,label] of [['warning-machine','machine','Semua mesin'],['warning-brand','brand','Semua brand']]){
       const el=$(id),selected=el.value,values=[...new Set(packers.map(r=>r[key]))].sort();
       el.innerHTML=`<option value="ALL">${label}</option>`+values.map(v=>`<option value="${safe(v)}">${safe(key==='brand'?(v==='ARB12'?'ARB 12':v==='ARB16'?'ARB 16':v):v)}</option>`).join('');
@@ -229,8 +230,8 @@
     const date=$('warning-date').value,shift=$('warning-shift').value,machine=$('warning-machine').value,brand=$('warning-brand').value;
     const rows=packers.filter(r=>r.date===date&&(shift==='ALL'||r.shift===shift)&&(machine==='ALL'||r.machine===machine)&&(brand==='ALL'||r.brand===brand));
     const groups=groupProductionWarnings(rows),affected=new Set(groups.flatMap(g=>g.records.map(r=>r.id))).size;
-    $('warning-summary').textContent=`${displayDate(date)} · ${shift==='ALL'?'Semua shift':shift} · ${rows.length} pemeriksaan · ${affected} pemeriksaan dengan warning · ${groups.length} kelompok trouble`;
-    $('warning-table').innerHTML=!groups.length?'<div class="empty">Tidak ada warning Packaging pada filter ini.</div>':`<div class="table-wrap"><table><thead><tr><th>Shift</th><th>Mesin / Brand</th><th>Trouble</th><th>Kemunculan</th><th>Terakhir</th><th>Detail pemeriksaan</th></tr></thead><tbody>${groups.map(g=>`<tr><td>${safe(g.shift)}</td><td><b>${safe(g.machine)}</b><br>${safe(displayBrand({type:'Packer',brand:g.brand}))}</td><td>${safe(g.warning)}</td><td><b>${g.records.length} kali</b></td><td>${safe(g.records[0].time)}</td><td><details><summary>Detail (${g.records.length})</summary><ul>${g.records.map(r=>`<li><b>${safe(r.time)}</b> · ${safe(r.qc)}${r.trouble?`<br>Trouble point: ${safe(r.trouble)}`:''}${r.notes?`<br>Keterangan: ${safe(r.notes)}`:''}</li>`).join('')}</ul></details></td></tr>`).join('')}</tbody></table></div>`;
+    $('warning-summary').textContent=`${displayDate(date)} · ${shift==='ALL'?'Semua shift':shift} · ${type==='ALL'?'Semua bagian':type==='Maker'?'Batangan':'Packaging'} · ${rows.length} pemeriksaan · ${affected} pemeriksaan dengan warning · ${groups.length} kelompok trouble`;
+    $('warning-table').innerHTML=!groups.length?'<div class="empty">Tidak ada warning pada filter ini.</div>':`<div class="table-wrap"><table><thead><tr><th>Bagian</th><th>Shift</th><th>Mesin / Brand</th><th>Trouble</th><th>Kemunculan</th><th>Terakhir</th><th>Detail pemeriksaan</th></tr></thead><tbody>${groups.map(g=>`<tr><td>${g.type==='Maker'?'Batangan':'Packaging'}</td><td>${safe(g.shift)}</td><td><b>${safe(g.machine)}</b><br>${safe(displayBrand({type:g.type,brand:g.brand}))}</td><td>${safe(g.warning)}</td><td><b>${g.records.length} kali</b></td><td>${safe(g.records[0].time)}</td><td><details><summary>Detail (${g.records.length})</summary><ul>${g.records.map(r=>`<li><b>${safe(r.time)}</b> · ${safe(r.qc)}${r.trouble?`<br>Trouble point: ${safe(r.trouble)}`:''}${r.notes?`<br>Keterangan: ${safe(r.notes)}`:''}</li>`).join('')}</ul></details></td></tr>`).join('')}</tbody></table></div>`;
   }
 
   function renderHistory(){const rows=historyRows();$('history-count').textContent=`${num(rows.length)} inspeksi sesuai filter · tabel menampilkan 100 terbaru · Excel memuat semua hasil`;$('history-table').innerHTML=tableMarkup(rows.slice(0,100),canWrite())}
@@ -456,7 +457,7 @@
     $('physical-fields').innerHTML=Object.entries(PHYSICAL).map(([key,m])=>`<div class="field"><label for="maker-${key}">${m.label} (${m.unit})</label><input id="maker-${key}" type="number" step="${m.step}" min="0" placeholder="Nilai terukur"><span class="target" id="target-${key}">Pilih brand untuk melihat target</span></div>`).join('');
     buildVisual('maker-visuals',MAKER_VISUAL,'maker');buildVisual('packer-visuals',PACKER_VISUAL,'packer');
     $('warning-date').value=today();
-    ['warning-date','warning-shift','warning-machine','warning-brand'].forEach(id=>$(id).addEventListener('change',renderProductionWarnings));
+    ['warning-type','warning-date','warning-shift','warning-machine','warning-brand'].forEach(id=>$(id).addEventListener('change',renderProductionWarnings));
     $('warning-refresh').addEventListener('click',loadRecords);
     document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>showView(button.dataset.view)));
     document.querySelectorAll('[data-open-station]').forEach(button=>button.addEventListener('click',()=>toggleStationForm(button.dataset.openStation,true)));
