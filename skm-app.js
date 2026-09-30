@@ -29,21 +29,26 @@
 
   function assess(r){
     if(isMachineEvent(r)){const valid=Boolean(r.trouble?.trim()&&r.notes?.trim());return {status:valid?(r.machineEvent==='REPAIRED'?'MACHINE REPAIRED':'MACHINE TROUBLE'):'INVALID',issues:valid?[]:['Isi trouble point dan keterangan.'],inspected:0,good:0}}
-    const issues=[];let inspected=0,good=0;
+    const issues=[];let inspected=0,good=0,physicalChecked=0,physicalGood=0,visualChecked=0,visualGood=0;
     if(r.type==='Maker')for(const [key,meta] of Object.entries(PHYSICAL)){
       const val=r.physical?.[key],bounds=boundsFor(r)?.[key];if(val==null||val===''||!Array.isArray(bounds)||!Number.isFinite(Number(val)))continue;
-      inspected++;if(Number(val)>=Number(bounds[0])&&Number(val)<=Number(bounds[1]))good++;
+      inspected++;physicalChecked++;if(Number(val)>=Number(bounds[0])&&Number(val)<=Number(bounds[1])){good++;physicalGood++;}
       else issues.push(`${meta.label} ${num(val)} ${meta.unit} (target ${num(bounds[0])}–${num(bounds[1])})`);
     }
     const sample=Number(r.sample);
     if(Number.isInteger(sample)&&sample>0)for(const [name,v] of Object.entries(r.visual||{})){
       if(v==null||v==='')continue;const count=Number(v);
       if(!Number.isInteger(count)||count<0||count>sample)return {status:'INVALID',issues:[`${name}: jumlah baik harus 0–${sample}.`],inspected:0,good:0};
-      inspected+=sample;good+=count;if(100*count/sample<Number(rulesFor(r).slice().sort((a,b)=>Number(b.min)-Number(a.min))[0]?.min??71))issues.push(`${name}: ${pct(count,sample)} in-spec (${sample-count} ${r.type==='Maker'?'batang':'pack'} bermasalah)`);
+      inspected+=sample;good+=count;visualChecked+=sample;visualGood+=count;if(100*count/sample<Number(rulesFor(r).slice().sort((a,b)=>Number(b.min)-Number(a.min))[0]?.min??71))issues.push(`${name}: ${pct(count,sample)} in-spec (${sample-count} ${r.type==='Maker'?'batang':'pack'} bermasalah)`);
     }
     if(!Number.isInteger(sample)||sample<1||sample>10000)return {status:'INVALID',issues:['Jumlah sampel harus bilangan 1–10.000.'],inspected:0,good:0};
     if(!inspected&&!r.noFinding)return {status:'PENDING',issues:['Isi minimal satu parameter yang diperiksa.'],inspected:0,good:0};
     if(!inspected&&r.noFinding){inspected=sample;good=sample}
+    if(r.type==='Maker'){
+      if(!physicalChecked||!visualChecked)return {status:'PENDING',issues:['Isi minimal satu parameter physical dan satu parameter visual untuk perhitungan 50:50.'],inspected:0,good:0};
+      // Normalisasi ke 100 poin agar ringkasan, tabel, dan ekspor menggunakan bobot 50:50.
+      good=50*physicalGood/physicalChecked+50*visualGood/visualChecked;inspected=100;
+    }
     const rate=100*good/inspected,rules=rulesFor(r).slice().sort((a,b)=>Number(b.min)-Number(a.min));
     return {status:rules.find(rule=>rate>=Number(rule.min))?.label||'INVALID',issues,inspected,good};
   }
