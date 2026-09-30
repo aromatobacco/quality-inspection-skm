@@ -111,9 +111,9 @@
     if(id==='settings'&&currentUser?.role!=='ADMIN')return;closeMasterForm();
     document.querySelectorAll('.section').forEach(el=>el.classList.toggle('active',el.id===id));
     document.querySelectorAll('.nav-button').forEach(el=>{if(el.dataset.view===id)el.setAttribute('aria-current','page');else el.removeAttribute('aria-current')});
-    const info={dashboard:['Ringkasan Produksi SKM','Dashboard harian, mingguan, dan bulanan untuk Maker dan Packaging dalam satu halaman.'],maker:['Maker Station · Rokok Batangan','Catat pemeriksaan physical dan jumlah batang baik per parameter visual.'],packer:['Packer Station · Packaging','Catat jumlah pack baik, lalu lihat status Good, Fair, atau Bad otomatis.'],history:['Data Inspeksi SKM','Telusuri semua hasil inspeksi dari periode dan bagian SKM.'],settings:['Pengaturan Akun SKM','Kelola akses Admin, QC Inspector, dan Guest seperti dashboard SKT.']};
+    const info={dashboard:['Ringkasan Produksi SKM','Dashboard harian, mingguan, dan bulanan untuk Maker dan Packaging dalam satu halaman.'],maker:['Maker Station · Rokok Batangan','Catat pemeriksaan physical dan jumlah batang baik per parameter visual.'],packer:['Packer Station · Packaging','Catat jumlah pack baik, lalu lihat status Good, Fair, atau Bad otomatis.'],history:['Data Inspeksi SKM','Telusuri semua hasil inspeksi dari periode dan bagian SKM.'],'production-warning':['Warning Produksi Packaging','Temuan Packaging dikelompokkan berdasarkan tanggal sampling, shift, mesin, brand, dan trouble.'],settings:['Pengaturan Akun SKM','Kelola akses Admin, QC Inspector, dan Guest seperti dashboard SKT.']};
     $('view-title').textContent=info[id][0];$('view-description').textContent=info[id][1];
-    if(id==='dashboard')renderDashboard();if(id==='maker'||id==='packer'){toggleStationForm(id,false,{scroll:false});renderStation(id)}if(id==='history')renderHistory();if(id==='settings'){loadUsers();renderMasterSettings()};
+    if(id==='dashboard')renderDashboard();if(id==='maker'||id==='packer'){toggleStationForm(id,false,{scroll:false});renderStation(id)}if(id==='history')renderHistory();if(id==='production-warning')renderProductionWarnings();if(id==='settings'){loadUsers();renderMasterSettings()};
     window.scrollTo({top:0,behavior:'smooth'});
   }
   function productionWarnings(r){
@@ -205,6 +205,34 @@
     $(`${prefix}-chart-warning`).innerHTML=warnings.length?warnings.map(r=>`<div class="alert ${r.machineEvent==='REPAIRED'?'ok':''}"><b>${safe(displayBrand(r))} · ${safe(r.machine)} · ${safe(displayDate(r.date))} ${safe(r.time)}</b>${compactWarnings(r)}</div>`).join(''):'<div class="alert ok">Tidak ada warning pada periode ini.</div>';
   }
   function historyRows(){const from=$('history-from').value,to=$('history-to').value;return allRecords().filter(r=>(!from||r.date>=from)&&(!to||r.date<=to)&&($('history-shift').value==='ALL'||r.shift===$('history-shift').value)&&($('history-machine').value==='ALL'||r.machine===$('history-machine').value)&&($('history-type').value==='ALL'||r.type===$('history-type').value)&&($('history-brand').value==='ALL'||brandOf(r)===$('history-brand').value)&&($('history-status').value==='ALL'||r.result.status===$('history-status').value))}
+  function groupProductionWarnings(rows){
+    const grouped=new Map();
+    for(const r of rows){
+      if(r.type!=='Packer'||r.source==='Contoh')continue;
+      for(const warning of new Set(productionWarnings(r))){
+        const key=JSON.stringify([r.date,r.shift,r.machine,r.brand,warning]);
+        if(!grouped.has(key))grouped.set(key,{date:r.date,shift:r.shift,machine:r.machine,brand:r.brand,warning,records:[]});
+        const group=grouped.get(key);
+        if(!group.records.some(x=>x.id===r.id))group.records.push(r);
+      }
+    }
+    return [...grouped.values()].map(g=>({...g,records:g.records.slice().sort((a,b)=>String(b.time).localeCompare(String(a.time)))}))
+      .sort((a,b)=>b.records.length-a.records.length||a.shift.localeCompare(b.shift)||a.machine.localeCompare(b.machine)||a.warning.localeCompare(b.warning));
+  }
+  function renderProductionWarnings(){
+    const packers=manual.filter(r=>r.type==='Packer'&&r.source!=='Contoh');
+    for(const [id,key,label] of [['warning-machine','machine','Semua mesin'],['warning-brand','brand','Semua brand']]){
+      const el=$(id),selected=el.value,values=[...new Set(packers.map(r=>r[key]))].sort();
+      el.innerHTML=`<option value="ALL">${label}</option>`+values.map(v=>`<option value="${safe(v)}">${safe(key==='brand'?(v==='ARB12'?'ARB 12':v==='ARB16'?'ARB 16':v):v)}</option>`).join('');
+      el.value=values.includes(selected)?selected:'ALL';
+    }
+    const date=$('warning-date').value,shift=$('warning-shift').value,machine=$('warning-machine').value,brand=$('warning-brand').value;
+    const rows=packers.filter(r=>r.date===date&&(shift==='ALL'||r.shift===shift)&&(machine==='ALL'||r.machine===machine)&&(brand==='ALL'||r.brand===brand));
+    const groups=groupProductionWarnings(rows),affected=new Set(groups.flatMap(g=>g.records.map(r=>r.id))).size;
+    $('warning-summary').textContent=`${displayDate(date)} · ${shift==='ALL'?'Semua shift':shift} · ${rows.length} pemeriksaan · ${affected} pemeriksaan dengan warning · ${groups.length} kelompok trouble`;
+    $('warning-table').innerHTML=!groups.length?'<div class="empty">Tidak ada warning Packaging pada filter ini.</div>':`<div class="table-wrap"><table><thead><tr><th>Shift</th><th>Mesin / Brand</th><th>Trouble</th><th>Kemunculan</th><th>Terakhir</th><th>Detail pemeriksaan</th></tr></thead><tbody>${groups.map(g=>`<tr><td>${safe(g.shift)}</td><td><b>${safe(g.machine)}</b><br>${safe(displayBrand({type:'Packer',brand:g.brand}))}</td><td>${safe(g.warning)}</td><td><b>${g.records.length} kali</b></td><td>${safe(g.records[0].time)}</td><td><details><summary>Detail (${g.records.length})</summary><ul>${g.records.map(r=>`<li><b>${safe(r.time)}</b> · ${safe(r.qc)}${r.trouble?`<br>Trouble point: ${safe(r.trouble)}`:''}${r.notes?`<br>Keterangan: ${safe(r.notes)}`:''}</li>`).join('')}</ul></details></td></tr>`).join('')}</tbody></table></div>`;
+  }
+
   function renderHistory(){const rows=historyRows();$('history-count').textContent=`${num(rows.length)} inspeksi sesuai filter · tabel menampilkan 100 terbaru · Excel memuat semua hasil`;$('history-table').innerHTML=tableMarkup(rows.slice(0,100),canWrite())}
   function setHistoryPeriod(){const kind=$('history-period').value,d=dateOf($('history-from').value||today());let start=dateKey(d),end=start;if(kind==='weekly'){d.setDate(d.getDate()-(d.getDay()+6)%7);start=dateKey(d);d.setDate(d.getDate()+6);end=dateKey(d)}if(kind==='monthly'){start=start.slice(0,7)+'-01';end=dateKey(new Date(d.getFullYear(),d.getMonth()+1,0))}$('history-from').value=start;$('history-to').value=end;renderHistory()}
   function exportExcel(){const rows=historyRows();if(!rows.length){showToast('Tidak ada data pada filter untuk diekspor.');return}const visual=[...new Set([...MAKER_VISUAL,...PACKER_VISUAL,...master.visuals.map(x=>x.name),...rows.flatMap(r=>Object.keys(r.visual||{}))])],cols=['Tanggal','Jam','Bagian','Nama QC','Nama Operator','Shift','Brand','Mesin','Jumlah Sampel','Status','In-Spec (%)','Out-Spec (%)','Trouble Point','Keterangan',...Object.values(PHYSICAL).map(x=>`Average ${x.label} (${x.unit})`),...visual.map(n=>`Visual ${n} (baik)`)],cell=v=>`<Cell><Data ss:Type="${typeof v==='number'&&Number.isFinite(v)?'Number':'String'}">${safe(v??'')}</Data></Cell>`;const data=rows.map(r=>[r.date,r.time,r.type==='Maker'?'Rokok Batangan':'Packaging',r.qc,r.operator||'',r.shift,displayBrand(r),r.machine,r.sample,r.result.status,r.result.inspected?+(100*r.result.good/r.result.inspected).toFixed(1):'',r.result.inspected?+(100*(r.result.inspected-r.result.good)/r.result.inspected).toFixed(1):'',r.trouble||'',r.notes||'',...Object.keys(PHYSICAL).map(k=>r.physical?.[k]??''),...visual.map(n=>r.visual?.[n]??'')]);const xml=`<?xml version="1.0" encoding="UTF-8"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Inspeksi SKM"><Table>${[cols,...data].map(row=>`<Row>${row.map(cell).join('')}</Row>`).join('')}</Table></Worksheet></Workbook>`;const url=URL.createObjectURL(new Blob([xml],{type:'application/vnd.ms-excel;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=`inspeksi-skm-${today()}.xls`;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000)}
@@ -242,7 +270,7 @@
       const data=await window.skmApiRequest('/api/inspections');
       if(sequence!==loadSequence||currentUser?.id!==userId)return;
       manual=(data.inspections||[]).map(mapInspection);
-      renderMasterOptions();renderDashboard();renderStation('maker');renderStation('packer');renderHistory();
+      renderMasterOptions();renderDashboard();renderStation('maker');renderStation('packer');renderHistory();renderProductionWarnings();
       $('sync-status').textContent=`${num(manual.length)} inspeksi tersinkron · ${new Intl.DateTimeFormat('id-ID',{hour:'2-digit',minute:'2-digit'}).format(new Date())}`;
     }catch(error){
       if(sequence!==loadSequence||currentUser?.id!==userId)return;
@@ -260,7 +288,7 @@
     for(const id of ['maker-qc','packer-qc']){$(id).value=user.displayName;$(id).readOnly=true}
     document.querySelectorAll('.tabs .nav-button[data-view="maker"],.tabs .nav-button[data-view="packer"]')
       .forEach(button=>button.classList.toggle('hidden',!canWrite()));
-    $('history-nav').classList.toggle('hidden',user.role==='GUEST_EXTERNAL');
+    $('history-nav').classList.toggle('hidden',user.role==='GUEST_EXTERNAL');$('warning-nav').classList.toggle('hidden',user.role==='GUEST_EXTERNAL');
     $('settings-nav').classList.toggle('hidden',user.role!=='ADMIN');
     try{await loadMaster()}catch(error){showToast(`Gagal memuat master: ${error.message||error}`)}
     document.body.classList.add('authenticated');
@@ -427,6 +455,9 @@
     ['maker-time','packer-time'].forEach(id=>$(id).innerHTML='<option value="">Pilih jam</option>'+hours.map(h=>`<option>${h}</option>`).join(''));
     $('physical-fields').innerHTML=Object.entries(PHYSICAL).map(([key,m])=>`<div class="field"><label for="maker-${key}">${m.label} (${m.unit})</label><input id="maker-${key}" type="number" step="${m.step}" min="0" placeholder="Nilai terukur"><span class="target" id="target-${key}">Pilih brand untuk melihat target</span></div>`).join('');
     buildVisual('maker-visuals',MAKER_VISUAL,'maker');buildVisual('packer-visuals',PACKER_VISUAL,'packer');
+    $('warning-date').value=today();
+    ['warning-date','warning-shift','warning-machine','warning-brand'].forEach(id=>$(id).addEventListener('change',renderProductionWarnings));
+    $('warning-refresh').addEventListener('click',loadRecords);
     document.querySelectorAll('[data-view]').forEach(button=>button.addEventListener('click',()=>showView(button.dataset.view)));
     document.querySelectorAll('[data-open-station]').forEach(button=>button.addEventListener('click',()=>toggleStationForm(button.dataset.openStation,true)));
     document.querySelectorAll('[data-close-station]').forEach(button=>button.addEventListener('click',()=>toggleStationForm(button.dataset.closeStation,false)));

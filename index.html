@@ -423,9 +423,10 @@
     </div>
     <div class="nav-group"><span class="nav-group-label">DATA</span>
       <button type="button" id="history-nav" class="nav-button" data-view="history"><span class="nav-symbol" aria-hidden="true">▤</span><span class="nav-label">Data Inspeksi</span></button>
+      <button type="button" id="warning-nav" class="nav-button" data-view="production-warning"><span class="nav-symbol" aria-hidden="true">⚠</span><span class="nav-label">Warning Produksi</span></button>
       <button type="button" id="settings-nav" class="nav-button hidden" data-view="settings"><span class="nav-symbol" aria-hidden="true">⚙</span><span class="nav-label">Pengaturan</span></button>
     </div>
-    <div class="side-foot"><strong>Developed @MT2026</strong><br>Version: v3.5.0 · 30 September 2026</div>
+    <div class="side-foot"><strong>Developed @MT2026</strong><br>Version: v3.6.0 · 30 September 2026</div>
   </nav>
   <main class="shell">
     <div class="hero"><div><h2 id="view-title">Ringkasan Produksi SKM</h2><p id="view-description">Dashboard harian, mingguan, dan bulanan untuk Maker dan Packaging dalam satu halaman.</p></div><span class="flag">Sigaret Kretek Mesin</span></div>
@@ -494,6 +495,17 @@
       <div class="filter-row" style="margin-bottom:15px"><div class="field"><label for="history-period">Periode</label><select id="history-period"><option value="daily">Per hari</option><option value="weekly">Per minggu</option><option value="monthly" selected>Per bulan</option></select></div><div class="field"><label for="history-from">Dari tanggal</label><input id="history-from" type="date"></div><div class="field"><label for="history-to">Sampai tanggal</label><input id="history-to" type="date"></div><div class="field"><label for="history-shift">Shift</label><select id="history-shift"><option value="ALL">Semua shift</option><option>Shift 1</option><option>Shift 2</option><option>Shift 3</option></select></div><div class="field"><label for="history-machine">Mesin</label><select id="history-machine"><option value="ALL">Semua mesin</option></select></div><div class="field"><label for="history-type">Bagian</label><select id="history-type"><option value="ALL">Semua bagian</option><option value="Maker">Rokok Batangan</option><option value="Packer">Packaging</option></select></div><div class="field"><label for="history-brand">Brand</label><select id="history-brand"><option value="ALL">Semua brand</option><option>AMB</option><option>AMT</option><option>ARM</option><option>ARB</option><option value="ARB12">ARB 12</option><option value="ARB16">ARB 16</option></select></div><div class="field"><label for="history-status">Status</label><select id="history-status"><option value="ALL">Semua status</option><option>GOOD</option><option>FAIR</option><option>BAD</option><option value="MACHINE TROUBLE">Machine Trouble</option></select></div><button type="button" id="history-clear" class="secondary">Reset Filter</button></div>
       <div class="helper" id="history-count" style="margin-bottom:10px"></div><div id="history-table"></div></div></section>
 
+    <section id="production-warning" class="section" aria-label="Warning Produksi Packaging">
+      <div class="panel"><div class="panel-title"><div><h3>Warning Produksi · Packaging</h3><p>Akumulasi temuan per hari dan shift. Warning setiap inspeksi tetap tersedia.</p></div><button type="button" id="warning-refresh" class="secondary">Segarkan</button></div>
+      <div class="grid col4">
+        <div class="field"><label for="warning-date">Tanggal sampling</label><input type="date" id="warning-date" required></div>
+        <div class="field"><label for="warning-shift">Shift</label><select id="warning-shift"><option value="ALL">Semua shift</option><option>Shift 1</option><option>Shift 2</option><option>Shift 3</option></select></div>
+        <div class="field"><label for="warning-machine">Mesin</label><select id="warning-machine"><option value="ALL">Semua mesin</option></select></div>
+        <div class="field"><label for="warning-brand">Brand</label><select id="warning-brand"><option value="ALL">Semua brand</option></select></div>
+      </div><p class="helper">Jumlah kemunculan = jumlah pemeriksaan dengan trouble yang sama, bukan jumlah pack cacat. Buka Detail untuk melihat waktu dan catatan QC.</p>
+      <p id="warning-summary" class="summary-strip" aria-live="polite"></p><div id="warning-table"></div></div>
+    </section>
+
     <section id="settings" class="section" aria-label="Pengaturan akun SKM">
       <div class="grid col2 master-grid">
         <section class="panel master-card"><div class="panel-title"><div><h3>Akun Pengguna SKM</h3><p>Status akun dan pengguna yang sedang online.</p></div><button type="button" class="primary" id="user-add">+ Tambah Akun</button></div><input class="master-search" type="search" id="user-search" placeholder="Cari nama / username…" aria-label="Cari pengguna"><p id="online-summary" class="summary-strip">Memuat status pengguna…</p><div id="users-list" class="master-list"><div class="empty">Memuat akun…</div></div><button type="button" id="users-refresh" class="secondary">Segarkan</button></section>
@@ -518,7 +530,7 @@
       <form id="status-form" class="master-dialog hidden" aria-label="Form status"><h3>Status Hasil</h3><div class="form-grid"><div class="field"><label for="status-label">Nama status</label><input id="status-label" required maxlength="30" placeholder="GOOD"></div><div class="field"><label for="status-min">Minimal In-Spec (%)</label><input id="status-min" type="number" required min="0" max="100" step="0.01"></div></div><div class="form-actions"><button class="primary" type="submit">Simpan Status</button><button class="secondary" id="status-cancel" type="button">Batal</button></div></form>
     </section>
   </main>
-  <footer class="foot"><span>PT Aroma Tobacco Internasional · Production Monitoring SKM</span><span><strong>Developed @MT2026</strong> · Version: <strong>v3.5.0</strong> · 30 September 2026</span></footer>
+  <footer class="foot"><span>PT Aroma Tobacco Internasional · Production Monitoring SKM</span><span><strong>Developed @MT2026</strong> · Version: <strong>v3.6.0</strong> · 30 September 2026</span></footer>
   </div>
   <div id="toast" role="status" aria-live="polite"></div>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

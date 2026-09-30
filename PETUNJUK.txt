@@ -1,0 +1,10 @@
+SKM v3.6.0 - Warning Produksi Packaging
+
+GITHUB: ganti index.html dan skm-app.js di folder utama. Pertahankan file konfigurasi, API dan gambar.
+SUPABASE: tidak ada SQL baru untuk menu ini; database harus sudah bisa memuat inspeksi.
+
+Menu Warning Produksi mengelompokkan data Packaging nyata per tanggal sampling, shift, mesin, brand, jenis trouble. Jumlah kali adalah pemeriksaan, bukan pack cacat. Data contoh tidak dihitung. Detail menampilkan jam, QC, trouble point, keterangan.
+Warning yang lama tetap tersedia. Physical 50% + visual 50% untuk batangan tetap berlaku.
+Admin, QC Inspector, Guest Internal dapat membuka menu. Guest External tetap hanya dashboard.
+Ambang warning mengikuti rumus yang sudah ada: visual di bawah ambang Good. Tidak ada status tindak lanjut baru pada versi ini.
+Setelah deploy selesai, Ctrl+Shift+R; pastikan versi v3.6.0.
