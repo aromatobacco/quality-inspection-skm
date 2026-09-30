@@ -52,6 +52,36 @@
     const rate=100*good/inspected,rules=rulesFor(r).slice().sort((a,b)=>Number(b.min)-Number(a.min));
     return {status:rules.find(rule=>rate>=Number(rule.min))?.label||'INVALID',issues,inspected,good};
   }
+  function qualityRates(r){
+    if(isMachineEvent(r))return {physical:null,visual:null,overall:null,physicalCount:0,visualCount:0};
+    let pc=0,pg=0,vc=0,vg=0,vn=0;
+    if(r.type==='Maker')for(const key of Object.keys(PHYSICAL)){
+      const val=r.physical?.[key],bounds=boundsFor(r)?.[key];
+      if(val==null||val===''||!Array.isArray(bounds)||!Number.isFinite(Number(val)))continue;
+      pc++;if(Number(val)>=Number(bounds[0])&&Number(val)<=Number(bounds[1]))pg++;
+    }
+    const sample=Number(r.sample);
+    if(Number.isInteger(sample)&&sample>0)for(const v of Object.values(r.visual||{})){
+      if(v==null||v==='')continue;const n=Number(v);
+      if(!Number.isInteger(n)||n<0||n>sample)continue;
+      vc+=sample;vg+=n;vn++;
+    }
+    const physical=pc?100*pg/pc:null,visual=vc?100*vg/vc:null;
+    return {physical,visual,overall:r.type==='Maker'?(physical!=null&&visual!=null?(physical+visual)/2:null):visual,physicalCount:pc,visualCount:vn};
+  }
+  function qualityCards(rates,rules,caption){
+    const sorted=rules.slice().sort((a,b)=>Number(b.min)-Number(a.min));
+    return [['overall','Overall In-Spec','Physical 50% + Visual 50%'],['visual','Visual In-Spec','Jumlah batang baik per parameter visual'],['physical','Physical In-Spec','Berat · Diameter · Pressure Drop · Ventilasi']].map(([key,title,help])=>{
+      const rate=rates[key],label=rate==null?'BELUM DINILAI':sorted.find(x=>rate>=Number(x.min))?.label||'BELUM DINILAI',tone=statusTone(label);
+      return `<article class="quality-score-card ${tone}"><div class="quality-score-head"><span>${title}</span><span class="quality-score-dot" aria-hidden="true"></span></div><div class="quality-score-main"><strong>${rate==null?'—':rate.toFixed(1)+'%'}</strong><span class="quality-score-out">Out: ${rate==null?'—':(100-rate).toFixed(1)+'%'}</span></div><span class="tag ${tone}">${safe(label)}</span><small>${safe(help)}</small><small>${safe(caption)}</small></article>`;
+    }).join('');
+  }
+  function renderQualitySummary(id,rows){
+    const eligible=rows.filter(r=>r.type==='Maker'&&!isMachineEvent(r)&&!['INVALID','PENDING'].includes(assess(r).status)).map(qualityRates).filter(r=>r.overall!=null);
+    const rates={};for(const key of ['overall','visual','physical'])rates[key]=eligible.length?eligible.reduce((n,r)=>n+r[key],0)/eligible.length:null;
+    $(id).innerHTML=qualityCards(rates,master.statuses,`${eligible.length} pemeriksaan lengkap · rata-rata skor per pemeriksaan`);
+  }
+
   function demoData(){
     const out=[],base=dateOf(today()),brands=['ARM','AMB','ARB','AMT','ARB'];
     for(let offset=0;offset<53;offset++){
@@ -90,6 +120,7 @@
   function updateForm(type){
     {const prefix=type==='Maker'?'maker':'packer',event=Boolean($(`${prefix}-machine-event`).value);$(`${prefix}-measurements`).classList.toggle('hidden',event);const sample=$(`${prefix}-sample`);sample.disabled=event;sample.required=!event;sample.closest('.field').classList.toggle('hidden',event);document.querySelectorAll(`#${prefix}-measurements input`).forEach(el=>el.disabled=event);$(`${prefix}-trouble`).required=event;$(`${prefix}-notes`).required=event;$(`${prefix}-trouble-hint`).textContent=event?'(wajib)':'(opsional)';$(`${prefix}-notes-hint`).textContent=event?'(wajib)':'(opsional)'}
     const r=draft(type),a=assess(r),prefix=type==='Maker'?'maker':'packer',names=visualNames(type);
+    if(type==='Maker'){$('maker-form-quality-scores').innerHTML=qualityCards(qualityRates(r),rulesFor(r),isMachineEvent(r)?'Kejadian mesin · tanpa skor kualitas':'Parameter kosong tidak dihitung');$('maker-form-quality-scores').classList.toggle('hidden',isMachineEvent(r));}
     const status=$(`${prefix}-status`);status.textContent=a.status==='INVALID'&&r.machineEvent?(r.machineEvent==='REPAIRED'?'Mesin Diperbaiki':'Machine Trouble'):a.status==='INVALID'?'PERIKSA INPUT':a.status==='PENDING'?'BELUM DINILAI':a.status==='MACHINE TROUBLE'?'Machine Trouble':a.status==='MACHINE REPAIRED'?'Mesin Diperbaiki':a.status;
     status.className=`status-${statusTone(a.status)}`;
     $(`${prefix}-reason`).textContent=a.issues.length?`${r.machineEvent?'Lengkapi catatan mesin':'Parameter bermasalah'}:\n• ${a.issues.join('\n• ')}`:isMachineEvent(r)?`Trouble point: ${r.trouble}\nKeterangan: ${r.notes}`:'Parameter terisi sesuai spesifikasi.';
@@ -150,6 +181,7 @@
   function renderPhysical(rows){const brand=$('physical-brand').value,machine=$('physical-machine').value,makers=rows.filter(r=>r.type==='Maker'&&brandOf(r)===brand&&(machine==='ALL'||r.machine===machine)).slice().reverse();
     $('physical-charts').innerHTML=Object.entries(PHYSICAL).map(([key,meta])=>{const limits=master.brands.find(b=>b.station==='Maker'&&b.code===brand)?.physicalLimits||boundsFor(makers.find(r=>boundsFor(r)?.[key])||{type:'Maker',brand})||{},[lo,hi]=limits[key]||[0,1],measured=makers.filter(r=>r.physical?.[key]!=null&&Number.isFinite(Number(r.physical[key]))),avg=measured.length?measured.reduce((a,r)=>a+Number(r.physical[key]),0)/measured.length:null,points=measured.map(r=>({value:Number(r.physical[key]),label:`${r.date.slice(5)} ${r.time} · ${r.machine}`}));return `<article class="panel chart-panel"><div class="panel-title"><div><h3>${meta.label} · ${safe(brand)}</h3><p>LSL ${num(lo)} · USL ${num(hi)} ${meta.unit}</p></div><div style="text-align:right"><b>${avg==null?'—':num(avg)+' '+meta.unit}</b><div class="tiny muted">Rata-rata · ${measured.length} titik</div></div></div><div class="plot">${chartLine(points,{lo,hi,unit:meta.unit})}</div><div class="legend"><span>Aktual</span><span class="limit">Batas target</span><span class="outside">Out-Spec</span></div></article>`}).join('')}
   function renderDashboard(){const bounds=periodBounds(),rows=filtered(),good=rows.filter(isTopStatus).length,fair=rows.filter(r=>r.result.status==='FAIR').length,bad=rows.filter(r=>!isTopStatus(r)&&r.result.status!=='FAIR'&&!isMachineEvent(r)).length,trouble=rows.filter(r=>r.result.status==='MACHINE TROUBLE').length,inspected=rows.reduce((a,r)=>a+r.result.inspected,0),passes=rows.reduce((a,r)=>a+r.result.good,0),maker=rows.filter(r=>r.type==='Maker').length,packer=rows.length-maker;
+    renderQualitySummary('dashboard-quality-scores',rows);
     $('period-caption').innerHTML=`<strong>${safe(bounds.caption)}</strong> · ${maker} inspeksi Rokok Batangan · ${packer} inspeksi Packaging${$('show-demo').checked?' · termasuk data contoh':''}`;
     for(const [type,prefix] of [['Maker','maker'],['Packer','packer']]){const station=rows.filter(r=>r.type===type),samples=station.reduce((sum,r)=>sum+r.result.inspected,0),passed=station.reduce((sum,r)=>sum+r.result.good,0);$(`${prefix}-score`).textContent=pct(passed,samples);$(`${prefix}-out-score`).textContent=`Out: ${pct(samples-passed,samples)}`;$(`${prefix}-summary-count`).textContent=`${num(station.length)} pemeriksaan · overall In-Spec`}
     $('kpi-total').textContent=num(rows.length);$('kpi-total-sub').textContent=`${maker} Maker + ${packer} Packaging`;$('kpi-good').textContent=num(good);$('kpi-good-sub').textContent=`${pct(good,rows.filter(r=>!isMachineEvent(r)).length)} dari pemeriksaan kualitas`;$('kpi-bad').textContent=num(fair+bad);$('kpi-bad-sub').textContent=[...new Set(rows.filter(r=>!isTopStatus(r)&&!isMachineEvent(r)).map(r=>r.result.status))].map(label=>`${rows.filter(r=>r.result.status===label).length} ${label}`).join(' · ')||'Tidak ada warning';$('kpi-rate').textContent=`${pct(passes,inspected)} / ${pct(inspected-passes,inspected)}`;$('kpi-rate-sub').textContent='Persentase parameter yang diisi';
@@ -175,6 +207,7 @@
   function renderStation(prefix){
     const type=prefix==='maker'?'Maker':'Packer',bounds=stationBounds(prefix),brand=$(`${prefix}-chart-brand`).value,machine=$(`${prefix}-chart-machine`).value;
     const rows=allRecords().filter(r=>r.type===type&&r.date>=bounds.start&&r.date<=bounds.end&&(brand==='ALL'||brandOf(r)===brand)&&(machine==='ALL'||r.machine===machine));
+    if(prefix==='maker')renderQualitySummary('maker-quality-scores',rows);
     const good=rows.filter(isTopStatus).length,bad=rows.filter(r=>!isTopStatus(r)&&!isMachineEvent(r)).length,qualityCount=rows.filter(r=>!isMachineEvent(r)).length,inspected=rows.reduce((n,r)=>n+r.result.inspected,0),passes=rows.reduce((n,r)=>n+r.result.good,0);
     $(`${prefix}-chart-caption`).textContent=`${bounds.caption} · ${brand==='ALL'?'Semua brand':brand} · ${machine==='ALL'?'Semua mesin':machine} · ${rows.length} inspeksi${$('show-demo').checked?' · termasuk data contoh':''}`;
     $(`${prefix}-chart-total`).textContent=num(rows.length);$(`${prefix}-chart-good`).textContent=num(good);

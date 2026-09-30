@@ -1,6 +1,6 @@
-SKM v3.6.1
-GITHUB: ganti index.html dan skm-app.js di folder utama.
-SUPABASE: tidak perlu SQL baru.
-Warning Produksi kini mencakup Batangan dan Packaging. Filter Bagian, Tanggal, Shift, Mesin, Brand. Kelompok dipisahkan berdasarkan bagian agar temuan tidak tercampur. Warning sebelumnya dan bobot 50:50 tetap berlaku.
-Batangan memuat physical rendah/tinggi, visual bermasalah, dan status kejadian mesin sesuai warning sebelumnya.
-Refresh Ctrl+Shift+R setelah deployment; footer v3.6.1.
+SKM v3.7.0
+GITHUB: ganti index.html dan skm-app.js di folder utama. SUPABASE: tidak ada SQL baru.
+Tiga kartu skor Batangan: Overall, Visual, Physical, masing-masing persentase In/Out dan status sesuai master. Overall 50:50.
+Kartu muncul pada dashboard, halaman Batangan, dan form input Batangan. Ringkasan rata-rata skor per pemeriksaan lengkap; kejadian mesin serta pemeriksaan tanpa kedua bagian tidak dihitung. Status ringkasan memakai ambang master saat ini.
+Warning Produksi Batangan/Packaging dan fitur sebelumnya tetap ada.
+Refresh Ctrl+Shift+R setelah deployment, versi v3.7.0.
