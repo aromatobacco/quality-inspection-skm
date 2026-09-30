@@ -1,6 +1,1 @@
-SKM v3.7.0
-GITHUB: ganti index.html dan skm-app.js di folder utama. SUPABASE: tidak ada SQL baru.
-Tiga kartu skor Batangan: Overall, Visual, Physical, masing-masing persentase In/Out dan status sesuai master. Overall 50:50.
-Kartu muncul pada dashboard, halaman Batangan, dan form input Batangan. Ringkasan rata-rata skor per pemeriksaan lengkap; kejadian mesin serta pemeriksaan tanpa kedua bagian tidak dihitung. Status ringkasan memakai ambang master saat ini.
-Warning Produksi Batangan/Packaging dan fitur sebelumnya tetap ada.
-Refresh Ctrl+Shift+R setelah deployment, versi v3.7.0.
+GitHub: ganti index.html dan TAMBAHKAN skm-app-v3.7.1.js di folder utama yang sama. Jangan ubah namanya. File skm-app.js lama boleh tetap ada; index baru memakai file baru. Supabase tidak perlu SQL baru. Semua fitur v3.7.0 termasuk kartu, 50:50, warning batangan/packaging tetap ada. Setelah deployment selesai, refresh halaman. Footer v3.7.1.
