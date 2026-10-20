@@ -1,1 +1,21 @@
-GitHub: ganti index.html dan TAMBAHKAN skm-app-v3.7.1.js di folder utama yang sama. Jangan ubah namanya. File skm-app.js lama boleh tetap ada; index baru memakai file baru. Supabase tidak perlu SQL baru. Semua fitur v3.7.0 termasuk kartu, 50:50, warning batangan/packaging tetap ada. Setelah deployment selesai, refresh halaman. Footer v3.7.1.
+SKM v3.9.0 - Dashboard Summary
+
+GITHUB: ganti index.html dan tambahkan skm-app-v3.9.0.js di folder utama. Nama file harus sama. Commit kedua file sekaligus, tunggu GitHub Pages selesai deployment, lalu refresh. Footer harus v3.9.0.
+SUPABASE: tidak perlu SQL baru. Konfigurasi, API, logo dan background yang lama tetap digunakan.
+
+DASHBOARD:
+Satu filter utama: Harian / Mingguan Senin-Jumat / Bulanan, tanggal atau bulan, brand, mesin, shift. Caption selalu mencantumkan rentang tanggal aktual, brand, mesin, shift.
+Ringkasan hanya satu set: total sampling, Good/Fair/Bad, serta ringkasan Batangan dan Packaging.
+Grafik physical HANYA rata-rata per hari: satu titik untuk setiap tanggal, bobot sama per nilai sampling. Tidak ada lagi grafik per sampling atau filter grafik kedua pada Dashboard.
+Grafik bulanan mencakup seluruh tanggal termasuk Sabtu/Minggu. Hari kosong tanpa titik (bukan nol). Grafik panjang dapat digeser mendatar.
+
+STATION BATANGAN:
+Grafik physical per sampling tetap di sini beserta batas spesifikasi. Filter periode, tanggal/bulan, brand, mesin dan shift memiliki caption rentang tanggal. Grafik akumulasi harian duplikat dihapus dari station.
+
+WARNING DASHBOARD:
+Seluruh warning pada SATU tanggal (bisa dipilih dalam rentang summary) ditampilkan dalam panel scroll, bukan hanya empat terbaru. Brand, mesin dan shift mengikuti filter utama. Batangan/Packaging serta jam/QC/shift jelas di tiap catatan.
+Menu Warning Produksi dan fitur input/history/master tetap tersedia.
+
+Pembulatan hanya untuk tampilan; nilai input, database dan status tidak diubah. Bobot Batangan tetap physical 50% dan visual 50%.
+
+Angka ekstrem pada grafik tetap mengikuti input database. Contoh diameter ratusan mm pada screenshot perlu diperiksa pada Data Inspeksi; revisi ini tidak menghapus/mengoreksi nilai tersebut otomatis.
