@@ -1,0 +1,24 @@
+SKM v3.8.0 - Revisi 20 Oktober 2026
+
+GITHUB:
+1. Ekstrak ZIP ini.
+2. Ganti index.html di folder utama repository quality-inspection-skm.
+3. Tambahkan skm-app-v3.8.0.js DI FOLDER YANG SAMA. Jangan ganti nama file.
+4. Commit kedua file sekaligus. Tunggu GitHub Pages selesai deployment.
+5. Muat ulang halaman. Footer harus v3.8.0. File JS lama boleh tetap ada.
+Pertahankan supabase-config.js, skm-api.js, logo dan gambar background yang sudah ada.
+
+SUPABASE: tidak perlu SQL/migrasi untuk revisi ini.
+
+REVISI:
+- Nama login, judul tab, header dan footer: Dashboard SKM.
+- Tampilan standar dan average berat/diameter: 2 angka desimal; pressure drop/ventilasi: bilangan bulat.
+- Pembulatan hanya tampilan. Nilai input, standar asli dan perhitungan status tidak dibulatkan.
+- Grafik aktual tetap tersedia. Tambahan grafik mingguan Senin-Jumat ada di Dashboard (di bawah grafik aktual) dan Rokok Batangan.
+- Pilih tanggal dalam minggu yang diinginkan di bagian Trend Physical Mingguan. Brand/mesin mengikuti filter physical di atasnya. Pilihan minggu terpisah dari periode grafik aktual.
+- Tiap titik adalah rata-rata nilai average sampling pada tanggal tersebut (setiap sampling berbobot sama, tidak dibobot jumlah batang). Hari kosong tampil tanpa titik, tidak dianggap 0. Machine Trouble/Diperbaiki tidak masuk rata-rata.
+- Data contoh hanya dihitung bila opsi Tampilkan data contoh aktif.
+- Detail harian menampilkan tanggal, average, dan jumlah sampling.
+- Fitur login, master, warning Batangan/Packaging, skor 50:50, dan ekspor tetap dari versi sebelumnya.
+
+Jika perlu kembali: pasang kembali index.html versi sebelumnya dan file JS pasangannya. Tidak ada data database yang diubah oleh pemasangan ini.
