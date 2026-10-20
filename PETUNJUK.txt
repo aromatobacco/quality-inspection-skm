@@ -1,5 +1,7 @@
-SKM v3.9.2
-GITHUB: ganti index.html dan tambahkan skm-app-v3.9.2.js di folder utama. Jangan ubah nama file. Commit keduanya, tunggu deployment, refresh sampai versi v3.9.2.
-SUPABASE: tidak perlu diubah.
-Dashboard memiliki satu panel status: jumlah sampling Good (hijau), Fair (kuning), Bad (merah), persentase masing-masing, total catatan dan bar komposisi. Semua mengikuti filter utama. Persentase memakai jumlah sampling yang berstatus Good/Fair/Bad; kejadian mesin dikecualikan.
-Semua revisi 3.9.1 dipertahankan: minggu Senin-Sabtu, grafik Dashboard rata-rata harian, station per sampling, filter dan rentang tanggal jelas, warning satu hari yang dapat di-scroll.
+SKM v3.9.3 - Average harian per brand + standar
+GITHUB: ganti index.html dan tambahkan skm-app-v3.9.3.js di folder utama. Jangan ubah nama file. Commit bersamaan, tunggu deployment lalu refresh hingga versi v3.9.3.
+SUPABASE: tidak perlu SQL baru. Standar diambil dari Master Brand Batangan yang sudah ada.
+
+Dashboard: filter Brand grafik physical tepat di atas empat grafik. Grafik selalu satu brand, bukan gabungan brand. Pilihan brand grafik terpisah dari summary; periode, mesin dan shift grafik mengikuti filter utama. Saat brand summary dipilih ke salah satu brand Batangan, brand grafik ikut berpindah; setelah itu bisa dipilih lagi lewat filter grafik.
+Grafik tetap average harian (bobot sama per sampling). Garis LSL = batas bawah, USL = batas atas sesuai master parameter brand saat ini. Skala mencakup nilai average dan kedua garis standar. Titik average di luar standar ditandai merah. Hari kosong tidak dianggap nol. Jika data kosong namun standar tersedia, garis standar tetap tampil.
+Semua fitur 3.9.2 tetap: panel Good/Fair/Bad berwarna, minggu Senin-Sabtu, Dashboard summary, station grafik per sampling, warning satu hari scroll. Pembulatan hanya tampilan. Input database tidak diubah.
