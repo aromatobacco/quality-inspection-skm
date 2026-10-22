@@ -1,7 +1,13 @@
-SKM v3.9.3 - Average harian per brand + standar
-GITHUB: ganti index.html dan tambahkan skm-app-v3.9.3.js di folder utama. Jangan ubah nama file. Commit bersamaan, tunggu deployment lalu refresh hingga versi v3.9.3.
-SUPABASE: tidak perlu SQL baru. Standar diambil dari Master Brand Batangan yang sudah ada.
+SKM v3.9.4 - Istirahat / Mesin Mati
 
-Dashboard: filter Brand grafik physical tepat di atas empat grafik. Grafik selalu satu brand, bukan gabungan brand. Pilihan brand grafik terpisah dari summary; periode, mesin dan shift grafik mengikuti filter utama. Saat brand summary dipilih ke salah satu brand Batangan, brand grafik ikut berpindah; setelah itu bisa dipilih lagi lewat filter grafik.
-Grafik tetap average harian (bobot sama per sampling). Garis LSL = batas bawah, USL = batas atas sesuai master parameter brand saat ini. Skala mencakup nilai average dan kedua garis standar. Titik average di luar standar ditandai merah. Hari kosong tidak dianggap nol. Jika data kosong namun standar tersedia, garis standar tetap tampil.
-Semua fitur 3.9.2 tetap: panel Good/Fair/Bad berwarna, minggu Senin-Sabtu, Dashboard summary, station grafik per sampling, warning satu hari scroll. Pembulatan hanya tampilan. Input database tidak diubah.
+GITHUB: ganti index.html dan tambahkan skm-app-v3.9.4.js di folder utama. Commit kedua file, tunggu GitHub Pages selesai deployment, lalu refresh sampai versi v3.9.4. Pertahankan konfigurasi, API dan gambar yang lama.
+SUPABASE: tidak perlu SQL baru.
+
+Rentang otomatis: jam sampling 00.00 <= jam < 01.00 WIB (tanggal sampling yang dipilih). Jam 01.00 sudah dihitung normal. Berlaku Batangan dan Packaging.
+- Form pada jam ini menampilkan Istirahat / Mesin Mati; parameter kualitas ditutup. Trouble point/keterangan opsional karena keterangan istirahat disediakan otomatis.
+- Catatan baru disimpan sebagai kejadian mesin dengan 0 sampel, tanpa physical/visual. Memakai format kejadian mesin yang sudah didukung database.
+- Catatan pada jam ini tidak masuk grafik physical per sampling, average harian, trend Good, atau skor Good/Fair/Bad.
+- Data Inspeksi dan Excel tetap memuat catatan dengan label/keterangan Istirahat / Mesin Mati.
+- Catatan lama pada jam ini otomatis dikecualikan dari grafik di tampilan, tanpa mengubah nilai di database. Data lama tidak dihapus atau dibulatkan.
+- Jam istirahat terjadwal tidak ditampilkan sebagai warning cacat produksi.
+Seluruh fitur sebelumnya (Senin-Sabtu, filter brand/master LSL/USL, summary berwarna, warning harian scroll) dipertahankan.
