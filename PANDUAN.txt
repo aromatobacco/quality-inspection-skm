@@ -1,0 +1,8 @@
+UPDATE GRAFIK v3.10.1
+
+GitHub: ganti index.html dan tambahkan skm-app-v3.10.1.js di folder yang sama. Tunggu deployment selesai lalu refresh.
+
+Jika v3.10.0 sudah dipasang, TIDAK perlu update Supabase lagi.
+Jika masih memakai v3.9.7, pasang migrasi UPDATE-v3.10.0.sql dari paket v3.10.0 terlebih dahulu untuk fitur master parameter.
+
+Grafik harian dan mingguan mengikuti lebar kartu; bulanan dapat digeser agar tanggal terbaca. Tinggi desktop 360px, HP 320px. Sumbu Y mencakup minimal satu interval bernomor di bawah dan di atas semua nilai data serta LSL/USL. Nilai standar tetap mengikuti master brand.
