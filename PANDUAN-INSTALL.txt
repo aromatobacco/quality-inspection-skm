@@ -1,0 +1,42 @@
+UPDATE SKM v3.10.0 — lanjutan v3.9.7
+
+ISI PEMBARUAN
+- Master Parameter Visual Batangan: tambah, edit nama, hapus, naik/turun, dan drag untuk urutan.
+- Master Parameter Visual Packaging dipisahkan menjadi Pack, OPP, MOP.
+- Setiap kelompok dapat ditambah/diedit/dihapus dan diurutkan sendiri.
+- Form inspeksi Packaging mengikuti kelompok dan urutan master.
+- Parameter dapat dipindahkan antar kelompok Packaging melalui Edit.
+- Tombol naik/turun tersedia untuk penggunaan HP/tablet.
+- Nilai inspeksi lama tetap disimpan. Label parameter lama disimpan dalam snapshot riwayat.
+
+URUTAN PEMASANGAN
+1. Simpan salinan index.html dan file aplikasi v3.9.7 sebagai cadangan.
+2. Buka Supabase proyek SKM > SQL Editor > New query.
+3. Salin SELURUH isi supabase/UPDATE-v3.10.0.sql lalu Run.
+   Gunakan proyek SKM yang sudah dipakai aplikasi, bukan proyek baru.
+   Ini pembaruan struktur dan API, bukan impor data ke tabel.
+   Tidak perlu menjalankan ulang script instalasi awal atau menghapus tabel.
+4. Di repository GitHub quality-inspection-skm:
+   - Ganti index.html dengan index.html dalam paket ini.
+   - Tambahkan skm-app-v3.10.0.js pada folder yang sama dengan index.html.
+   - Jangan hapus konfigurasi Supabase, gambar, atau file pendukung lainnya.
+5. Commit perubahan, tunggu GitHub Pages selesai deploy, lalu refresh halaman.
+6. Login sebagai Admin > Pengaturan > Master Parameter Visual.
+   Pastikan ada Batangan, Packaging Pack, Packaging OPP, Packaging MOP.
+7. Coba ubah satu nama, urutkan, lalu refresh untuk memastikan perubahan tersimpan.
+
+PENGELOMPOKAN AWAL
+Nama yang mengandung MOP serta Posisi Pack/Jml Pack/Jumlah Pack masuk MOP.
+Nama yang mengandung OPP atau ACCESS masuk OPP.
+Parameter Packaging lainnya masuk Pack.
+Periksa klasifikasi ini dan koreksi melalui Edit sesuai kebutuhan produksi.
+Drag hanya untuk urutan di kelompok yang sama; pindah kelompok melalui Edit.
+Hapus menghilangkan parameter dari input baru; riwayat inspeksi tetap tersimpan.
+
+VALIDASI PAKET
+Pemeriksaan sintaks JavaScript, parser SQL dan PL/pgSQL, serta uji logika
+pengelompokan, urutan, label riwayat, grafik, filter dan istirahat telah lolos.
+Migrasi belum dijalankan pada Supabase produksi pengguna.
+Pengujian tampilan drag secara langsung di browser produksi belum dilakukan.
+Jika muncul pesan perlu pembaruan Supabase, pastikan langkah 2–3 dijalankan
+pada proyek Supabase yang digunakan website.
