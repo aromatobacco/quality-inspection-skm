@@ -30,6 +30,7 @@
   function friendlyError(error) {
     const message = error && error.message ? error.message : String(error || 'Permintaan gagal.');
     if (message.includes('Failed to fetch')) return 'Tidak dapat terhubung ke Supabase. Periksa internet dan konfigurasi project.';
+    if (message.includes('skm_inspections_page')) return 'Jalankan PERBAIKAN-SUPABASE.sql terlebih dahulu di SQL Editor Supabase.';
     if (message.includes('skm_api_request')) return 'Database SKM belum siap. Jalankan supabase-setup.sql di SQL Editor Supabase.';
     return message;
   }
@@ -38,7 +39,7 @@
     const method = String(options.method || 'GET').toUpperCase();
     const payload = parseBody(options.body);
     const sessionToken = localStorage.getItem(SESSION_KEY);
-    const { data, error } = await getClient().rpc('skm_api_request', {
+    const { data, error } = await getClient().rpc(path === '/api/inspections' && method === 'GET' ? 'skm_inspections_page' : 'skm_api_request', {
       p_path: path,
       p_method: method,
       p_payload: payload,

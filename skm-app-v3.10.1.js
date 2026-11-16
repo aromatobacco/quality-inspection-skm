@@ -172,7 +172,7 @@
     button.textContent=open?`✓  Form ${prefix==='maker'?'Rokok Batangan':'Packaging'} Terbuka`:`⊕  Input ${prefix==='maker'?'Rokok Batangan':'Packaging'}`;
     if(scroll)(open?$(`${prefix}-form-area`):button).scrollIntoView({behavior:'smooth',block:'start'});
   }
-  function showView(id){
+  function showView(id,reload=true){
     if(['maker','packer'].includes(id)&&!canWrite())return;
     if(currentUser?.role==='GUEST_EXTERNAL'&&id!=='dashboard')return;
     if(id==='settings'&&currentUser?.role!=='ADMIN')return;closeMasterForm();
@@ -181,6 +181,7 @@
     const info={dashboard:['Summary Dashboard SKM','Ringkasan kualitas, rata-rata physical harian, dan warning produksi satu hari.'],maker:['Maker Station · Rokok Batangan','Catat pemeriksaan physical dan jumlah batang baik per parameter visual.'],packer:['Packer Station · Packaging','Catat jumlah pack baik, lalu lihat status Good, Fair, atau Bad otomatis.'],history:['Data Inspeksi SKM','Telusuri semua hasil inspeksi dari periode dan bagian SKM.'],'production-warning':['Warning Produksi','Temuan Batangan dan Packaging dikelompokkan berdasarkan bagian, tanggal sampling, shift, mesin, brand, dan trouble.'],settings:['Pengaturan Akun SKM','Kelola akses Admin, QC Inspector, dan Guest seperti dashboard SKT.']};
     $('view-title').textContent=info[id][0];$('view-description').textContent=info[id][1];
     if(id==='dashboard')renderDashboard();if(id==='maker'||id==='packer'){toggleStationForm(id,false,{scroll:false});renderStation(id)}if(id==='history')renderHistory();if(id==='production-warning')renderProductionWarnings();if(id==='settings'){loadUsers();renderMasterSettings()};
+    if(reload&&currentUser&&id!=='settings')loadRecords(false);
     window.scrollTo({top:0,behavior:'smooth'});
   }
   function productionWarnings(r){
@@ -370,7 +371,7 @@
 
   function renderHistory(){const rows=historyRows();$('history-count').textContent=`${num(rows.length)} inspeksi sesuai filter · tabel menampilkan 100 terbaru · Excel memuat semua hasil`;$('history-table').innerHTML=tableMarkup(rows.slice(0,100),canWrite())}
   function setHistoryPeriod(){const kind=$('history-period').value,d=dateOf($('history-from').value||today());let start=dateKey(d),end=start;if(kind==='weekly'){d.setDate(d.getDate()-(d.getDay()+6)%7);start=dateKey(d);d.setDate(d.getDate()+6);end=dateKey(d)}if(kind==='monthly'){start=start.slice(0,7)+'-01';end=dateKey(new Date(d.getFullYear(),d.getMonth()+1,0))}$('history-from').value=start;$('history-to').value=end;renderHistory()}
-  function exportExcel(){const rows=historyRows();if(!rows.length){showToast('Tidak ada data pada filter untuk diekspor.');return}const visual=[...new Set([...MAKER_VISUAL,...PACKER_VISUAL,...master.visuals.map(x=>x.key||x.name),...rows.flatMap(r=>Object.keys(r.visual||{}))])],cols=['Tanggal','Jam','Bagian','Nama QC','Nama Operator','Shift','Brand','Mesin','Jumlah Sampel','Status','In-Spec (%)','Out-Spec (%)','Trouble Point','Keterangan',...Object.values(PHYSICAL).map(x=>`Average ${x.label} (${x.unit})`),...visual.map(n=>`Visual ${visualExportLabel(n,rows)} (baik)`)],cell=v=>`<Cell><Data ss:Type="${typeof v==='number'&&Number.isFinite(v)?'Number':'String'}">${safe(v??'')}</Data></Cell>`;const data=rows.map(r=>[r.date,r.time,r.type==='Maker'?'Rokok Batangan':'Packaging',r.qc,r.operator||'',r.shift,displayBrand(r),r.machine,r.sample,r.result.status==='REST'?REST_LABEL:r.result.status,r.result.inspected?+(100*r.result.good/r.result.inspected).toFixed(1):'',r.result.inspected?+(100*(r.result.inspected-r.result.good)/r.result.inspected).toFixed(1):'',r.trouble||'',isRestRecord(r)?[cleanRestNotes(r.notes),'Istirahat / Mesin Mati · tidak disertakan dalam grafik.'].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(' · '):r.notes||'',...Object.keys(PHYSICAL).map(k=>r.physical?.[k]??''),...visual.map(n=>r.visual?.[n]??'')]);const xml=`<?xml version="1.0" encoding="UTF-8"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Inspeksi SKM"><Table>${[cols,...data].map(row=>`<Row>${row.map(cell).join('')}</Row>`).join('')}</Table></Worksheet></Workbook>`;const url=URL.createObjectURL(new Blob([xml],{type:'application/vnd.ms-excel;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=`inspeksi-skm-${today()}.xls`;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000)}
+  function exportExcel(){const range=requestedRange();if(pendingRange||loadedRange!==JSON.stringify([currentUser?.id,range.start,range.end])){showToast('Tunggu sampai seluruh data periode selesai dimuat.');return}const rows=historyRows();if(!rows.length){showToast('Tidak ada data pada filter untuk diekspor.');return}const visual=[...new Set([...MAKER_VISUAL,...PACKER_VISUAL,...master.visuals.map(x=>x.key||x.name),...rows.flatMap(r=>Object.keys(r.visual||{}))])],cols=['Tanggal','Jam','Bagian','Nama QC','Nama Operator','Shift','Brand','Mesin','Jumlah Sampel','Status','In-Spec (%)','Out-Spec (%)','Trouble Point','Keterangan',...Object.values(PHYSICAL).map(x=>`Average ${x.label} (${x.unit})`),...visual.map(n=>`Visual ${visualExportLabel(n,rows)} (baik)`)],cell=v=>`<Cell><Data ss:Type="${typeof v==='number'&&Number.isFinite(v)?'Number':'String'}">${safe(v??'')}</Data></Cell>`;const data=rows.map(r=>[r.date,r.time,r.type==='Maker'?'Rokok Batangan':'Packaging',r.qc,r.operator||'',r.shift,displayBrand(r),r.machine,r.sample,r.result.status==='REST'?REST_LABEL:r.result.status,r.result.inspected?+(100*r.result.good/r.result.inspected).toFixed(1):'',r.result.inspected?+(100*(r.result.inspected-r.result.good)/r.result.inspected).toFixed(1):'',r.trouble||'',isRestRecord(r)?[cleanRestNotes(r.notes),'Istirahat / Mesin Mati · tidak disertakan dalam grafik.'].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(' · '):r.notes||'',...Object.keys(PHYSICAL).map(k=>r.physical?.[k]??''),...visual.map(n=>r.visual?.[n]??'')]);const xml=`<?xml version="1.0" encoding="UTF-8"?><Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"><Worksheet ss:Name="Inspeksi SKM"><Table>${[cols,...data].map(row=>`<Row>${row.map(cell).join('')}</Row>`).join('')}</Table></Worksheet></Workbook>`;const url=URL.createObjectURL(new Blob([xml],{type:'application/vnd.ms-excel;charset=utf-8'})),a=document.createElement('a');a.href=url;a.download=`inspeksi-skm-${today()}.xls`;a.click();setTimeout(()=>URL.revokeObjectURL(url),3000)}
 
   function mapInspection(row){
     return {
@@ -387,7 +388,7 @@
 
   function showAuth(message='',needsBootstrap=false){
     activeSession++;
-    currentUser=null;managedUsers=[];manual=[];
+    currentUser=null;managedUsers=[];manual=[];loadedRange='';pendingRange='';loadSequence++;
     document.body.classList.remove('authenticated');
     $('app-root').classList.add('hidden');
     $('auth-screen').classList.remove('hidden');
@@ -397,22 +398,50 @@
     if(!needsBootstrap)$('setup-form').classList.add('hidden');
   }
 
-  async function loadRecords(){
+  let loadedRange='',pendingRange='',loadedAt=0;
+  function requestedRange(){
+    const view=document.querySelector('.section.active')?.id;
+    if(view==='history')return {start:$('history-from').value||'0001-01-01',end:$('history-to').value||'9999-12-31'};
+    if(view==='maker'||view==='packer')return stationBounds(view);
+    if(view==='production-warning'){const date=$('warning-date').value||today();return {start:date,end:date}}
+    return periodBounds();
+  }
+  function renderRecords(){
+    renderDashboard();renderStation('maker');renderStation('packer');renderHistory();renderProductionWarnings();
+  }
+  async function loadRecords(force=true){
     if(!currentUser)return;
+    const range=requestedRange(),key=JSON.stringify([currentUser.id,range.start,range.end]);
+    if(force===false&&(pendingRange===key||(loadedRange===key)))return;
     const sequence=++loadSequence,userId=currentUser.id;
-    $('sync-status').textContent='Mengambil data inspeksi bersama…';
+    pendingRange=key;
+    $('export-csv').disabled=true;
+    $('sync-status').textContent='Mengambil seluruh hasil pada periode terpilih…';
     try{
-      const data=await window.skmApiRequest('/api/inspections');
-      if(sequence!==loadSequence||currentUser?.id!==userId)return;
-      manual=(data.inspections||[]).map(mapInspection);
-      renderMasterOptions();renderDashboard();renderStation('maker');renderStation('packer');renderHistory();renderProductionWarnings();
-      $('sync-status').textContent=`${num(manual.length)} inspeksi tersinkron · ${new Intl.DateTimeFormat('id-ID',{hour:'2-digit',minute:'2-digit'}).format(new Date())}`;
+      if(range.start>range.end)throw new Error('Tanggal awal harus sebelum atau sama dengan tanggal akhir.');
+      let cursor=null,rows=[];
+      do{
+        const data=await window.skmApiRequest('/api/inspections',{body:{from:range.start,to:range.end,cursor}});
+        if(sequence!==loadSequence||currentUser?.id!==userId)return;
+        if(!Array.isArray(data.inspections))throw new Error('Format respons inspeksi tidak valid.');
+        rows.push(...data.inspections);
+        const next=data.nextCursor||null;
+        if(next&&next===cursor)throw new Error('Cursor data tidak bergerak.');
+        cursor=next;
+        $('sync-status').textContent=`${num(rows.length)} inspeksi diterima, melengkapi periode…`;
+      }while(cursor);
+      manual=rows.map(mapInspection);
+      loadedRange=key;loadedAt=Date.now();
+      renderMasterOptions();renderRecords();
+      $('export-csv').disabled=false;
+      $('sync-status').textContent=`${num(manual.length)} inspeksi pada ${range.start} – ${range.end} tersinkron · ${new Intl.DateTimeFormat('id-ID',{hour:'2-digit',minute:'2-digit'}).format(new Date())}`;
     }catch(error){
       if(sequence!==loadSequence||currentUser?.id!==userId)return;
+      loadedRange='';manual=[];renderRecords();
       if(Number(error.status)===401){showAuth('Sesi berakhir. Silakan login kembali.');return}
-      $('sync-status').textContent='Gagal memuat data. Klik Segarkan untuk mencoba lagi.';
+      $('sync-status').textContent='Gagal memuat data periode ini. Klik Segarkan untuk mencoba lagi.';
       showToast(`Gagal membaca data: ${error.message||error}`);
-    }
+    }finally{if(sequence===loadSequence)pendingRange=''}
   }
 
   async function activateSession(user){
@@ -430,7 +459,6 @@
     $('auth-screen').classList.add('hidden');
     $('app-root').classList.remove('hidden');
     showView('dashboard');
-    await loadRecords();
   }
 
   async function initializeBackend(){
@@ -466,7 +494,7 @@
     finally{submit.disabled=false;submit.textContent=`Simpan Inspeksi ${type==='Maker'?'Rokok Batangan':'Packaging'}`}
   }
 
-  function editRecord(id){const r=manual.find(item=>item.id===id);if(!r||!canDeleteRecord(r))return;const prefix=r.type==='Maker'?'maker':'packer';delete $(`${prefix}-machine-event`).dataset.autoRest;delete $(`${prefix}-machine-event`).dataset.previousEvent;showView(prefix);toggleStationForm(prefix,true,{scroll:false});for(const key of ['shift','date','time','machine','operator'])$(`${prefix}-${key}`).value=r[key]??'';$(`${prefix}-brand`).value=brandOf(r);if(!$(`${prefix}-brand`).value){showToast('Brand lama sudah dihapus. Pilih brand aktif sebelum menyimpan.')} $(`${prefix}-sample`).value=r.sample||10;$(`${prefix}-qc`).value=r.qc;$(`${prefix}-notes`).value=r.notes||'';if(r.type==='Packer'){$('packer-machine-event').value=isRestRecord(r)?'REST':r.machineEvent||(r.machineTrouble?'TROUBLE':'');$('packer-trouble').value=r.trouble||''}if(r.type==='Maker'){$('maker-machine-event').value=isRestRecord(r)?'REST':r.machineEvent||(r.machineTrouble?'TROUBLE':'');$('maker-trouble').value=r.trouble||'';for(const key of Object.keys(PHYSICAL))$(`maker-${key}`).value=r.physical?.[key]??''}document.querySelectorAll(`.${prefix}-count`).forEach(el=>el.value=r.visual?.[el.dataset.name]??'');$(`${prefix}-form`).dataset.editId=r.id;updateTargets();updateForm(r.type);$(`${prefix}-form`).scrollIntoView({behavior:'smooth',block:'start'});showToast('Data dimuat. Simpan untuk memperbarui data bersama.')}
+  function editRecord(id){const r=manual.find(item=>item.id===id);if(!r||!canDeleteRecord(r))return;const prefix=r.type==='Maker'?'maker':'packer';delete $(`${prefix}-machine-event`).dataset.autoRest;delete $(`${prefix}-machine-event`).dataset.previousEvent;showView(prefix,false);toggleStationForm(prefix,true,{scroll:false});for(const key of ['shift','date','time','machine','operator'])$(`${prefix}-${key}`).value=r[key]??'';$(`${prefix}-brand`).value=brandOf(r);if(!$(`${prefix}-brand`).value){showToast('Brand lama sudah dihapus. Pilih brand aktif sebelum menyimpan.')} $(`${prefix}-sample`).value=r.sample||10;$(`${prefix}-qc`).value=r.qc;$(`${prefix}-notes`).value=r.notes||'';if(r.type==='Packer'){$('packer-machine-event').value=isRestRecord(r)?'REST':r.machineEvent||(r.machineTrouble?'TROUBLE':'');$('packer-trouble').value=r.trouble||''}if(r.type==='Maker'){$('maker-machine-event').value=isRestRecord(r)?'REST':r.machineEvent||(r.machineTrouble?'TROUBLE':'');$('maker-trouble').value=r.trouble||'';for(const key of Object.keys(PHYSICAL))$(`maker-${key}`).value=r.physical?.[key]??''}document.querySelectorAll(`.${prefix}-count`).forEach(el=>el.value=r.visual?.[el.dataset.name]??'');$(`${prefix}-form`).dataset.editId=r.id;updateTargets();updateForm(r.type);$(`${prefix}-form`).scrollIntoView({behavior:'smooth',block:'start'});showToast('Data dimuat. Simpan untuk memperbarui data bersama.')}
   async function removeInspection(id){
     const record=manual.find(r=>r.id===id);
     if(!record||!canDeleteRecord(record))return;
@@ -699,9 +727,12 @@
     $('users-list').addEventListener('click',event=>{
       const edit=event.target.closest('[data-user-edit]');if(edit){openUserEditor(edit.dataset.userEdit);return}const button=event.target.closest('[data-user-toggle]');if(button)toggleUser(button.dataset.userToggle,button.dataset.active==='true');
     });
+    const remoteDateControls=new Set(['period','period-date','period-month','history-period','history-from','history-to','warning-date','maker-period','maker-period-date','maker-period-month','packer-period','packer-period-date','packer-period-month']);
+    document.addEventListener('change',event=>{if(remoteDateControls.has(event.target.id))loadRecords(false)});
+    $('history-clear').addEventListener('click',()=>loadRecords(false));
     $('refresh-data').addEventListener('click',loadRecords);
-    document.addEventListener('visibilitychange',()=>{if(!document.hidden&&currentUser){heartbeat();loadRecords();if($('settings').classList.contains('active'))loadUsers()}});
-    setInterval(()=>{if(currentUser)heartbeat();if(!document.hidden&&currentUser){loadRecords();if($('settings').classList.contains('active'))loadUsers()}},60000);
+    document.addEventListener('visibilitychange',()=>{if(!document.hidden&&currentUser){heartbeat();if($('settings').classList.contains('active'))loadUsers()}});
+    setInterval(()=>{if(currentUser)heartbeat();if(!document.hidden&&currentUser){if($('settings').classList.contains('active'))loadUsers()}},60000);
     updateTargets();updateForm('Maker');updateForm('Packer');renderDashboard();renderHistory();
   }
   setup();
